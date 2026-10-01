@@ -52,7 +52,9 @@ def test_every_remaining_highway_passes_the_filter(highway_ways: list[dict[str, 
 
 
 def test_header_bounds_match_the_clip_box() -> None:
-    header = Reader(str(DEFAULT_PATHS.filtered), osm_entity_bits.NOTHING)
+    # Checked on the clipped file: merging in the UK boundary (osmium merge) does
+    # not carry header bounds over to the filtered file, and nothing reads them there.
+    header = Reader(str(DEFAULT_PATHS.clipped), osm_entity_bits.NOTHING)
     box = header.header().box()
     header.close()
     assert box.bottom_left.lon == pytest.approx(CLIP_BOX.min_lon)
