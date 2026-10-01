@@ -1,0 +1,21 @@
+# Valhalla, built from the filtered extract only. See routing/README.md.
+services:
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: spirited-valhalla
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./custom_files:/custom_files
+    environment:
+      # Never download OSM data: the only input is the filtered extract we copy in.
+      - tile_urls=
+      - use_tiles_ignore_pbf=True
+      # Set FORCE_REBUILD=True after re-running the extract pipeline.
+      - force_rebuild=${FORCE_REBUILD:-False}
+      - build_admins=True
+      - build_time_zones=True
+      - build_elevation=True
+      - serve_tiles=True
+      - server_threads=4
+    restart: unless-stopped

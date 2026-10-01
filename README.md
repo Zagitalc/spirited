@@ -13,13 +13,13 @@ speed limit, how often you meet junctions and villages, and elevation change.
 
 ## Status
 
-Stage 0 of 5. The repository structure, the OSM extract pipeline and the road safety
-filter exist. There is no routing, scoring, loop generation or usable app yet.
+Stage 1 of 5. The OSM extract pipeline, the road safety filter and car routing with
+Valhalla exist. There is no scoring, loop generation or usable app yet.
 
 | Stage | What | State |
 | --- | --- | --- |
-| 0 | Foundations: structure, tooling, OSM extract | In progress |
-| 1 | Routing with Valhalla | Not started |
+| 0 | Foundations: structure, tooling, OSM extract | Done |
+| 1 | Routing with Valhalla | In progress |
 | 2 | Road scoring | Not started |
 | 3 | Loop generation and HTTP API | Not started |
 | 4 | Android app | Not started |
@@ -89,7 +89,27 @@ cd android
 
 There is nothing to see yet beyond a placeholder screen.
 
-`make backend-test`, `make extract` and `make android` are shortcuts for the same
+### Routing
+
+Needs Docker Desktop and the map data from the previous step. From the repository
+root:
+
+```sh
+make routing        # builds Valhalla's tiles on first run, then serves on :8002
+```
+
+Then, from `backend`:
+
+```sh
+uv run pytest -q -m valhalla
+uv run python -m spirited.routing 51.4560,-0.9690 51.4014,-1.3231 --gpx reading-newbury.gpx
+```
+
+The second command prints the distance, time, the main roads used and the climbing,
+and writes a GPX file you can open in any map viewer. See `routing/README.md` for
+rebuilding after the map data changes.
+
+`make backend-test`, `make extract`, `make routing` and `make android` are shortcuts for the same
 commands.
 
 ## Which roads Spirited will use

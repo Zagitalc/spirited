@@ -3,6 +3,35 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
+## 2026-10-01: Routing with Valhalla in Docker
+
+**Decision.** Run the official `ghcr.io/valhalla/valhalla-scripted` image, built
+only from `region-filtered.osm.pbf` with administrative areas, time zones and
+elevation. The backend talks to it through a small client in `spirited.routing`
+and sends the same car costing profile with every request:
+
+| Option | Value | Why |
+| --- | --- | --- |
+| `use_tracks` | 0 | Never prefer tracks, should one slip through the filter |
+| `exclude_unpaved` | true | Refuse unpaved edges outright |
+| `use_living_streets` | 0 | Avoid living streets |
+| `service_penalty` | 300 s | Guards against mistagged service roads |
+| `use_ferry` | 0 | No ferries in a driving loop |
+| `ignore_access` | false | Respect every access restriction |
+| `use_highways` | 0.5 | Neutral for now; Stage 3 will lower it |
+
+The profile is pinned by a unit test. Routes are checked against the roads the
+filter removed by sending each leg back through `trace_attributes` with
+`shape_match: edge_walk`, which returns the OSM way id of every edge used.
+
+**Why.** Keeping the profile in Python rather than in Valhalla's server config means
+every request states exactly what it asked for. The client was checked against
+Valhalla 3.9 (through the `pyvalhalla` package) on a small synthetic network,
+which confirmed the request and response formats; the real region has to be
+checked on a machine that can download the map data.
+
+**Revisit when** loop generation needs options the profile does not cover.
+
 ## 2026-10-01: Patches instead of commits from Claude
 
 **Decision.** Claude prepares each stage as a patch with the git commands to apply

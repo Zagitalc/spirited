@@ -20,7 +20,15 @@ Spirited uses OpenStreetMap data in three ways:
 
 The Android app will show "© OpenStreetMap contributors" on the map from Stage 4.
 
+## Elevation
+
+Valhalla downloads elevation from the
+[Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) dataset on AWS, which
+combines several public sources. Its
+[attribution requirements](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)
+apply to anything that shows elevation, so the app's elevation profile will carry
+the required credit. The exact wording is to be confirmed before release in Stage 5.
+
 ## Still to check
 
-- Elevation data, added in Stage 1.
 - The map tile provider, chosen in Stage 4.
