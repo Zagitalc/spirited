@@ -38,3 +38,6 @@ android/captures/
 android/.kotlin/
 *.apk
 *.aab
+
+# Route exports from manual checks
+*.gpx

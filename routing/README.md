@@ -1,9 +1,11 @@
 # Routing
 
-Valhalla runs here in Docker. Its only input is
+Valhalla runs here in Docker. Its inputs are
 `backend/data/osm/region-filtered.osm.pbf`, the extract that has already been
-through the road safety filter, so the router cannot use a road the filter removed
-(see `docs/decisions.md`).
+through the road safety filter, so the router cannot use a road the filter removed,
+and `uk-admin.osm.pbf`, a generated UK boundary that tells Valhalla traffic drives
+on the left (see `docs/decisions.md`). The build log should say
+"Inserted 1 admin areas".
 
 ## Running it
 
@@ -16,7 +18,7 @@ make routing            # copies the filtered extract in, builds tiles, serves o
 or by hand:
 
 ```sh
-cp backend/data/osm/region-filtered.osm.pbf routing/custom_files/
+cp backend/data/osm/region-filtered.osm.pbf backend/data/osm/uk-admin.osm.pbf routing/custom_files/
 cd routing
 docker compose up -d
 docker compose logs -f valhalla     # wait for the build to finish
@@ -30,7 +32,7 @@ which is not committed. Later starts reuse the tiles and take seconds.
 After re-running the extract pipeline, copy the new file in and rebuild:
 
 ```sh
-cp backend/data/osm/region-filtered.osm.pbf routing/custom_files/
+cp backend/data/osm/region-filtered.osm.pbf backend/data/osm/uk-admin.osm.pbf routing/custom_files/
 cd routing && FORCE_REBUILD=True docker compose up -d --force-recreate
 ```
 

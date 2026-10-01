@@ -20,7 +20,7 @@ extract:
 
 # Copy the filtered extract into Valhalla's input folder, then build and serve.
 routing-data:
-	cp backend/data/osm/region-filtered.osm.pbf routing/custom_files/
+	cp backend/data/osm/region-filtered.osm.pbf backend/data/osm/uk-admin.osm.pbf routing/custom_files/
 
 routing: routing-data
 	cd routing && docker compose up -d && docker compose logs -f valhalla

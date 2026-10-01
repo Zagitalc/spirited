@@ -3,6 +3,26 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
+## 2026-10-01: A generated UK boundary for Valhalla
+
+**Decision.** The extract pipeline writes `uk-admin.osm.pbf`: one administrative
+boundary, tagged as the United Kingdom (`ISO3166-1=GB`, `admin_level=2`), drawn as
+a rectangle slightly larger than the clip box. Valhalla is built from it together
+with the filtered extract.
+
+**Why.** Valhalla needs a closed country boundary to know that traffic drives on
+the left, which affects turn costs. Clipping cuts the real England and UK boundary
+relations, so the first build reported "Inserted 0 admin areas". Keeping the
+relations whole with osmium's `smart` strategy did not help either, because the
+England extract we download does not contain every member of those relations. A
+generated boundary is small, does not depend on the extract, and was checked with
+`valhalla_build_admins` (Valhalla 3.9), which recorded `drive_on_right = 0` for it.
+
+**Cost.** It is not the real boundary, so Valhalla will treat anything inside the
+rectangle as the UK. Every road in the clip box is in England, so this changes
+nothing in practice; it would need replacing if the region ever reached Wales or
+the coast.
+
 ## 2026-10-01: Routing with Valhalla in Docker
 
 **Decision.** Run the official `ghcr.io/valhalla/valhalla-scripted` image, built
@@ -42,10 +62,7 @@ it. The project owner commits and pushes.
 ## 2026-10-01: Region and clip box
 
 **Decision.** Download an England extract and clip it with osmium to the
-box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the `smart` strategy, completing
-multipolygon and boundary relations. The first build used `complete_ways`, which
-cut the England and UK boundary relations at the box edge; Valhalla then reported
-"Inserted 0 admin areas" and could not tell that the UK drives on the left.
+box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the `complete_ways` strategy.
 
 The first version downloaded seven county extracts and merged them, but on
 2026-10-01 those addresses returned 404, so the pipeline now takes the whole of
