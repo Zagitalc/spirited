@@ -1,6 +1,6 @@
 """Command line for the extract pipeline.
 
-uv run python -m spirited.extract all       # fetch, clip, filter
+uv run python -m spirited.extract all       # fetch, clip, filter, admin
 uv run python -m spirited.extract filter    # re-run only the safety filter
 """
 
@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import argparse
 
+from spirited.extract.admin import add_admin_boundary
 from spirited.extract.clip import clip
 from spirited.extract.fetch import fetch
 from spirited.extract.roadfilter_pbf import filter_file, write_report
 from spirited.region import DEFAULT_PATHS, SOURCE_URLS, Paths
 
-STEPS = ("fetch", "clip", "filter")
+STEPS = ("fetch", "clip", "filter", "admin")
 
 
 def run_filter(paths: Paths) -> None:
@@ -41,8 +42,11 @@ def main(argv: list[str] | None = None) -> None:
             fetch(paths, force=args.force, urls=[args.url] if args.url else SOURCE_URLS)
         elif step == "clip":
             clip(paths)
-        else:
+        elif step == "filter":
             run_filter(paths)
+        else:
+            add_admin_boundary(paths)
+            print(f"added the UK boundary to {paths.filtered.name}")
 
 
 if __name__ == "__main__":

@@ -27,9 +27,8 @@ build/
 *.osm
 *.osm.bz2
 backend/data/osm/
-routing/valhalla_tiles/
-routing/elevation/
-routing/*.tar
+routing/custom_files/*
+!routing/custom_files/.gitkeep
 
 # Android and Gradle
 android/.gradle/
@@ -39,3 +38,6 @@ android/captures/
 android/.kotlin/
 *.apk
 *.aab
+
+# Route exports from manual checks
+*.gpx

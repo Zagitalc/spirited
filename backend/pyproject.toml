@@ -43,4 +43,5 @@ pythonVersion = "3.12"
 testpaths = ["tests"]
 markers = [
     "extract: needs the real regional extract in data/osm (run `make extract` first)",
+    "valhalla: needs Valhalla running (see routing/README.md)",
 ]

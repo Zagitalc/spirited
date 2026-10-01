@@ -58,6 +58,10 @@ class Paths:
         return self.root / "region-filtered.osm.pbf"
 
     @property
+    def admin(self) -> Path:
+        return self.root / "uk-admin.osm.pbf"
+
+    @property
     def manifest(self) -> Path:
         return self.root / "manifest.json"
 

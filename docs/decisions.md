@@ -3,6 +3,57 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
+## 2026-10-01: A generated UK boundary for Valhalla
+
+**Decision.** The last step of the extract pipeline adds one administrative
+boundary, tagged as the United Kingdom (`ISO3166-1=GB`, `admin_level=2`) and drawn
+as a rectangle slightly larger than the clip box, to `region-filtered.osm.pbf`.
+Its ids start at 10^12, far above any real OSM id, so the merged file stays sorted.
+A first version supplied it as a separate file with negative ids, and Valhalla's
+tile builder aborted with "Detected unsorted input data".
+
+**Why.** Valhalla needs a closed country boundary to know that traffic drives on
+the left, which affects turn costs. Clipping cuts the real England and UK boundary
+relations, so the first build reported "Inserted 0 admin areas". Keeping the
+relations whole with osmium's `smart` strategy did not help either, because the
+England extract we download does not contain every member of those relations. A
+generated boundary is small, does not depend on the extract, and was checked with
+`valhalla_build_admins` (Valhalla 3.9), which recorded `drive_on_right = 0` for it.
+
+**Cost.** It is not the real boundary, so Valhalla will treat anything inside the
+rectangle as the UK. Every road in the clip box is in England, so this changes
+nothing in practice; it would need replacing if the region ever reached Wales or
+the coast.
+
+## 2026-10-01: Routing with Valhalla in Docker
+
+**Decision.** Run the official `ghcr.io/valhalla/valhalla-scripted` image, built
+only from `region-filtered.osm.pbf` with administrative areas, time zones and
+elevation. The backend talks to it through a small client in `spirited.routing`
+and sends the same car costing profile with every request:
+
+| Option | Value | Why |
+| --- | --- | --- |
+| `use_tracks` | 0 | Never prefer tracks, should one slip through the filter |
+| `exclude_unpaved` | true | Refuse unpaved edges outright |
+| `use_living_streets` | 0 | Avoid living streets |
+| `service_penalty` | 300 s | Guards against mistagged service roads |
+| `use_ferry` | 0 | No ferries in a driving loop |
+| `ignore_access` | false | Respect every access restriction |
+| `use_highways` | 0.5 | Neutral for now; Stage 3 will lower it |
+
+The profile is pinned by a unit test. Routes are checked against the roads the
+filter removed by sending each leg back through `trace_attributes` with
+`shape_match: edge_walk`, which returns the OSM way id of every edge used.
+
+**Why.** Keeping the profile in Python rather than in Valhalla's server config means
+every request states exactly what it asked for. The client was checked against
+Valhalla 3.9 (through the `pyvalhalla` package) on a small synthetic network,
+which confirmed the request and response formats; the real region has to be
+checked on a machine that can download the map data.
+
+**Revisit when** loop generation needs options the profile does not cover.
+
 ## 2026-10-01: Patches instead of commits from Claude
 
 **Decision.** Claude prepares each stage as a patch with the git commands to apply
