@@ -22,8 +22,13 @@ def clip(paths: Paths, box: BBox = CLIP_BOX) -> None:
             "extract",
             "--bbox",
             box.as_osmium_arg(),
+            # "smart" with boundary relations keeps the England and UK boundaries
+            # whole, so Valhalla can build its admin areas (driving on the left,
+            # UK access rules). "complete_ways" cut them and Valhalla dropped them.
             "--strategy",
-            "complete_ways",
+            "smart",
+            "--option",
+            "types=multipolygon,boundary",
             "--set-bounds",
             str(paths.source),
             "-o",

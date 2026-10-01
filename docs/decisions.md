@@ -42,7 +42,10 @@ it. The project owner commits and pushes.
 ## 2026-10-01: Region and clip box
 
 **Decision.** Download an England extract and clip it with osmium to the
-box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the `complete_ways` strategy.
+box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the `smart` strategy, completing
+multipolygon and boundary relations. The first build used `complete_ways`, which
+cut the England and UK boundary relations at the box edge; Valhalla then reported
+"Inserted 0 admin areas" and could not tell that the UK drives on the left.
 
 The first version downloaded seven county extracts and merged them, but on
 2026-10-01 those addresses returned 404, so the pipeline now takes the whole of

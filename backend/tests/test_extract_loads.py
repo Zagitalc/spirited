@@ -6,7 +6,7 @@ import osmium
 import pytest
 from osmium.filter import KeyFilter
 from osmium.io import Reader
-from osmium.osm import Way, osm_entity_bits
+from osmium.osm import RELATION, WAY, Relation, Way, osm_entity_bits
 
 from spirited.region import CLIP_BOX, DEFAULT_PATHS
 from spirited.roadfilter import classify
@@ -57,3 +57,17 @@ def test_header_bounds_match_the_clip_box() -> None:
     header.close()
     assert box.bottom_left.lon == pytest.approx(CLIP_BOX.min_lon)
     assert box.top_right.lat == pytest.approx(CLIP_BOX.max_lat)
+
+
+def test_england_boundary_is_complete() -> None:
+    # Valhalla needs whole admin boundaries to know the UK drives on the left.
+    members: list[int] = []
+    for obj in osmium.FileProcessor(str(DEFAULT_PATHS.filtered), RELATION):
+        if not isinstance(obj, Relation):
+            continue
+        tags = obj.tags
+        if tags.get("boundary") == "administrative" and tags.get("name") == "England":
+            members = [m.ref for m in obj.members if m.type == "w"]
+    assert members, "England boundary relation missing"
+    ways = {obj.id for obj in osmium.FileProcessor(str(DEFAULT_PATHS.filtered), WAY)}
+    assert set(members) <= ways
