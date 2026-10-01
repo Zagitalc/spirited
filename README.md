@@ -66,14 +66,15 @@ uv run python -m spirited.extract all
 uv run pytest -q -m extract
 ```
 
-This downloads seven county extracts from Geofabrik (a few hundred megabytes),
-merges them, clips them to the region box and applies the road safety filter. The
+This downloads the England extract from Geofabrik (about 1.5 GB, so it takes a
+while), clips it to the region box and applies the road safety filter. The download
+is kept, so later runs reuse it unless Geofabrik has published a newer file. The
 output goes to `backend/data/osm/`, which is not committed:
 
 - `region-filtered.osm.pbf`: the extract Valhalla will be built from
 - `filter-report.json`: how many roads were excluded, and why
 - `excluded-ways.csv`: every excluded way, so you can look up a road you know
-- `manifest.json`: source files, checksums and download times
+- `manifest.json`: the source file, its checksum and download time
 
 ### Android
 

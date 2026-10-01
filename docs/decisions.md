@@ -12,10 +12,13 @@ it. The project owner commits and pushes.
 
 ## 2026-10-01: Region and clip box
 
-**Decision.** Download the Geofabrik extracts for Berkshire, Oxfordshire,
-Buckinghamshire, Hampshire, Surrey, Wiltshire and Greater London, merge them with
-osmium, and clip to the box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the
-`complete_ways` strategy.
+**Decision.** Download the Geofabrik England extract and clip it with osmium to the
+box 2.2°W to 0.30°W, 51.05°N to 51.90°N using the `complete_ways` strategy.
+
+The first version downloaded seven county extracts and merged them, but on
+2026-10-01 those addresses returned 404, so the pipeline now takes the whole of
+England. It is a larger download (about 1.5 GB) but has no merge step and does not
+depend on Geofabrik's county list.
 
 **Why.** A 90-minute loop from the edge of Berkshire can travel 30 km or more in any
 direction. The box reaches Swindon, Oxford, Basingstoke and Guildford, and includes
