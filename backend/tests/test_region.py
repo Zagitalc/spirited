@@ -1,4 +1,4 @@
-from spirited.region import CLIP_BOX, SOURCE_URL
+from spirited.region import CLIP_BOX, SOURCE_URLS
 
 # (name, lon, lat) of places the region must cover.
 MUST_COVER = [
@@ -23,7 +23,8 @@ def test_clip_box_stops_short_of_central_london() -> None:
     assert not CLIP_BOX.contains(-0.13, 51.51)
 
 
-def test_source_is_the_geofabrik_england_extract() -> None:
-    assert SOURCE_URL == (
-        "https://download.geofabrik.de/europe/united-kingdom/england-latest.osm.pbf"
-    )
+def test_every_mirror_serves_the_england_extract() -> None:
+    assert len(SOURCE_URLS) >= 2
+    for url in SOURCE_URLS:
+        assert url.startswith("https://")
+        assert url.endswith("england-latest.osm.pbf")

@@ -11,7 +11,7 @@ import argparse
 from spirited.extract.clip import clip
 from spirited.extract.fetch import fetch
 from spirited.extract.roadfilter_pbf import filter_file, write_report
-from spirited.region import DEFAULT_PATHS, Paths
+from spirited.region import DEFAULT_PATHS, SOURCE_URLS, Paths
 
 STEPS = ("fetch", "clip", "filter")
 
@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="spirited.extract")
     parser.add_argument("step", choices=(*STEPS, "all"))
     parser.add_argument("--force", action="store_true", help="re-download even if up to date")
+    parser.add_argument("--url", help="download from this URL instead of the built-in mirrors")
     args = parser.parse_args(argv)
 
     paths = DEFAULT_PATHS
@@ -37,7 +38,7 @@ def main(argv: list[str] | None = None) -> None:
     for step in steps:
         print(f"== {step}")
         if step == "fetch":
-            fetch(paths, force=args.force)
+            fetch(paths, force=args.force, urls=[args.url] if args.url else SOURCE_URLS)
         elif step == "clip":
             clip(paths)
         else:

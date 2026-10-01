@@ -5,11 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-# The Geofabrik county extracts are no longer at their old addresses (checked
-# 2026-10-01), so the whole of England is downloaded (about 1.5 GB) and clipped
-# locally to the region box.
+# The whole of England is downloaded (about 1.5 GB) and clipped locally to the region
+# box. Mirrors are tried in order. On 2026-10-01 Geofabrik's England file redirected to
+# a 404 and its dated files stalled, so the OpenStreetMap France mirror comes first.
 SOURCE_NAME = "england"
-SOURCE_URL = "https://download.geofabrik.de/europe/united-kingdom/england-latest.osm.pbf"
+SOURCE_URLS = (
+    "https://download.openstreetmap.fr/extracts/europe/united_kingdom/england-latest.osm.pbf",
+    "https://download.geofabrik.de/europe/united-kingdom/england-latest.osm.pbf",
+)
 
 
 @dataclass(frozen=True)

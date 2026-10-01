@@ -8,7 +8,7 @@ See <https://www.openstreetmap.org/copyright>.
 
 Spirited uses OpenStreetMap data in three ways:
 
-- **Extract.** The England extract from Geofabrik is clipped and filtered by the
+- **Extract.** The England extract from the OpenStreetMap France mirror or Geofabrik is clipped and filtered by the
   scripts in `backend/src/spirited/extract`. None of this data is committed to the
   repository.
 - **Routing graph.** From Stage 1, Valhalla builds its graph from the filtered

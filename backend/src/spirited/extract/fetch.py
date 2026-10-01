@@ -1,4 +1,4 @@
-"""Download the England extract from Geofabrik and record what was fetched."""
+"""Download the England extract and record what was fetched."""
 
 from __future__ import annotations
 
@@ -6,12 +6,21 @@ import hashlib
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from spirited.region import SOURCE_URL, Paths
+from spirited.region import SOURCE_URLS, Paths
 
 CHUNK = 1 << 20
+# Seconds without any data before a mirror counts as stalled and the next is tried.
+STALL_TIMEOUT = 60
+USER_AGENT = "spirited-extract/0.1 (+https://github.com/Zagitalc/spirited)"
+
+
+def _open(url: str):
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    return urllib.request.urlopen(request, timeout=STALL_TIMEOUT)
 
 
 def _md5(path: Path) -> str:
@@ -23,19 +32,17 @@ def _md5(path: Path) -> str:
 
 
 def _published_md5(url: str) -> str | None:
-    """Geofabrik's checksum for a file, or None if it does not publish one."""
+    """The mirror's checksum for a file, or None if it does not publish one."""
     try:
-        with urllib.request.urlopen(f"{url}.md5", timeout=60) as response:
+        with _open(f"{url}.md5") as response:
             return response.read().decode().split()[0]
-    except urllib.error.HTTPError as error:
-        if error.code == 404:
-            return None
-        raise
+    except (urllib.error.URLError, TimeoutError, IndexError):
+        return None
 
 
 def _download(url: str, target: Path) -> str | None:
     partial = target.with_suffix(target.suffix + ".part")
-    with urllib.request.urlopen(url, timeout=60) as response, partial.open("wb") as out:
+    with _open(url) as response, partial.open("wb") as out:
         last_modified = response.headers.get("Last-Modified")
         total = int(response.headers.get("Content-Length") or 0)
         done = 0
@@ -44,36 +51,53 @@ def _download(url: str, target: Path) -> str | None:
             done += len(chunk)
             if total and done % (100 * CHUNK) < CHUNK:
                 print(f"  {done >> 20} of {total >> 20} MB")
+    if total and done != total:
+        raise OSError(f"incomplete download: {done} of {total} bytes")
     partial.replace(target)
     return last_modified
 
 
-def fetch(paths: Paths, force: bool = False) -> dict[str, str | int | None]:
-    """Download the source extract, verify its checksum and write the manifest."""
-    paths.downloads.mkdir(parents=True, exist_ok=True)
-    target = paths.source
-    expected = _published_md5(SOURCE_URL)
+def _fetch_one(url: str, target: Path, force: bool) -> dict[str, str | int | None]:
+    expected = _published_md5(url)
     if expected is None:
-        print("Geofabrik publishes no checksum for this file; skipping verification")
-
+        print("  no checksum published here; skipping verification")
     last_modified = None
     up_to_date = target.exists() and expected is not None and _md5(target) == expected
     if force or not up_to_date:
-        print(f"downloading {SOURCE_URL}")
-        last_modified = _download(SOURCE_URL, target)
+        print(f"downloading {url}")
+        last_modified = _download(url, target)
     else:
         print(f"up to date: {target.name}")
-
     actual = _md5(target)
     if expected is not None and actual != expected:
-        raise RuntimeError(f"checksum mismatch for {target.name}: {actual} != {expected}")
-    source: dict[str, str | int | None] = {
-        "url": SOURCE_URL,
+        target.unlink()
+        raise OSError(f"checksum mismatch: {actual} != {expected}")
+    return {
+        "url": url,
         "md5": actual,
         "md5_verified": "yes" if expected else "no",
         "bytes": target.stat().st_size,
         "last_modified": last_modified,
     }
-    manifest = {"fetched_at": datetime.now(UTC).isoformat(timespec="seconds"), "source": source}
-    paths.manifest.write_text(json.dumps(manifest, indent=2) + "\n")
-    return source
+
+
+def fetch(
+    paths: Paths, force: bool = False, urls: Sequence[str] = SOURCE_URLS
+) -> dict[str, str | int | None]:
+    """Download the source extract from the first mirror that works."""
+    paths.downloads.mkdir(parents=True, exist_ok=True)
+    failures = []
+    for url in urls:
+        try:
+            source = _fetch_one(url, paths.source, force)
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            print(f"  failed: {error}")
+            failures.append(f"{url}: {error}")
+            continue
+        manifest = {
+            "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "source": source,
+        }
+        paths.manifest.write_text(json.dumps(manifest, indent=2) + "\n")
+        return source
+    raise RuntimeError("every mirror failed:\n" + "\n".join(failures))

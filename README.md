@@ -66,9 +66,11 @@ uv run python -m spirited.extract all
 uv run pytest -q -m extract
 ```
 
-This downloads the England extract from Geofabrik (about 1.5 GB, so it takes a
-while), clips it to the region box and applies the road safety filter. The download
-is kept, so later runs reuse it unless Geofabrik has published a newer file. The
+This downloads the England extract (about 1.5 GB, so it takes a while), clips it to
+the region box and applies the road safety filter. It tries the OpenStreetMap France
+mirror first and Geofabrik second, moving on if a mirror fails or sends nothing for
+60 seconds. To use another source, pass `--url <address of an England .osm.pbf>`.
+The download is kept, so later runs reuse it unless the mirror has a newer file. The
 output goes to `backend/data/osm/`, which is not committed:
 
 - `region-filtered.osm.pbf`: the extract Valhalla will be built from
@@ -120,4 +122,5 @@ The code is under the Apache License 2.0 (see `LICENSE`).
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
 available under the Open Database Licence. Extracts are downloaded from
+[OpenStreetMap France](https://download.openstreetmap.fr/extracts/) or
 [Geofabrik](https://download.geofabrik.de/). See `docs/attribution.md` for details.
