@@ -1,0 +1,41 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+.env.*
+*.keystore
+*.jks
+local.properties
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# OSM and routing data (rebuilt from scripts, never committed)
+*.pbf
+*.osm
+*.osm.bz2
+backend/data/osm/
+routing/valhalla_tiles/
+routing/elevation/
+routing/*.tar
+
+# Android and Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.kotlin/
+*.apk
+*.aab
