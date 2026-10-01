@@ -8,7 +8,7 @@ import subprocess
 from spirited.region import CLIP_BOX, BBox, Paths
 
 
-def _osmium() -> str:
+def osmium_exe() -> str:
     exe = shutil.which("osmium")
     if exe is None:
         raise RuntimeError("osmium-tool is not installed or not on PATH; see the README")
@@ -18,7 +18,7 @@ def _osmium() -> str:
 def clip(paths: Paths, box: BBox = CLIP_BOX) -> None:
     subprocess.run(
         [
-            _osmium(),
+            osmium_exe(),
             "extract",
             "--bbox",
             box.as_osmium_arg(),

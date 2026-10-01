@@ -5,10 +5,12 @@ revisit it.
 
 ## 2026-10-01: A generated UK boundary for Valhalla
 
-**Decision.** The extract pipeline writes `uk-admin.osm.pbf`: one administrative
-boundary, tagged as the United Kingdom (`ISO3166-1=GB`, `admin_level=2`), drawn as
-a rectangle slightly larger than the clip box. Valhalla is built from it together
-with the filtered extract.
+**Decision.** The last step of the extract pipeline adds one administrative
+boundary, tagged as the United Kingdom (`ISO3166-1=GB`, `admin_level=2`) and drawn
+as a rectangle slightly larger than the clip box, to `region-filtered.osm.pbf`.
+Its ids start at 10^12, far above any real OSM id, so the merged file stays sorted.
+A first version supplied it as a separate file with negative ids, and Valhalla's
+tile builder aborted with "Detected unsorted input data".
 
 **Why.** Valhalla needs a closed country boundary to know that traffic drives on
 the left, which affects turn costs. Clipping cuts the real England and UK boundary

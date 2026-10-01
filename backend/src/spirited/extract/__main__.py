@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 
-from spirited.extract.admin import write_admin_boundary
+from spirited.extract.admin import add_admin_boundary
 from spirited.extract.clip import clip
 from spirited.extract.fetch import fetch
 from spirited.extract.roadfilter_pbf import filter_file, write_report
@@ -45,8 +45,8 @@ def main(argv: list[str] | None = None) -> None:
         elif step == "filter":
             run_filter(paths)
         else:
-            write_admin_boundary(paths.admin)
-            print(f"wrote {paths.admin.name}")
+            add_admin_boundary(paths)
+            print(f"added the UK boundary to {paths.filtered.name}")
 
 
 if __name__ == "__main__":
