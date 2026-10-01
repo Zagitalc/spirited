@@ -1,1 +1,1 @@
-"""Builds the regional OSM extract: download, merge, clip, then filter."""
+"""Builds the regional OSM extract: download, clip, then filter."""

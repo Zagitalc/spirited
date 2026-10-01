@@ -5,19 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-GEOFABRIK_BASE = "https://download.geofabrik.de/europe/united-kingdom/england"
-
-# Geofabrik extract names. Greater London is included only so that the clip box can
-# take its western fringe, which loops from Windsor or Slough may cross.
-COUNTIES = (
-    "berkshire",
-    "oxfordshire",
-    "buckinghamshire",
-    "hampshire",
-    "surrey",
-    "wiltshire",
-    "greater-london",
-)
+# The Geofabrik county extracts are no longer at their old addresses (checked
+# 2026-10-01), so the whole of England is downloaded (about 1.5 GB) and clipped
+# locally to the region box.
+SOURCE_NAME = "england"
+SOURCE_URL = "https://download.geofabrik.de/europe/united-kingdom/england-latest.osm.pbf"
 
 
 @dataclass(frozen=True)
@@ -34,15 +26,12 @@ class BBox:
         return self.min_lon <= lon <= self.max_lon and self.min_lat <= lat <= self.max_lat
 
 
-# Reaches Swindon, Oxford, Basingstoke and Guildford; stops short of central London.
+# Reaches Swindon, Oxford, Basingstoke and Guildford, and takes the western fringe of
+# London for loops from Windsor or Slough, but stops short of central London.
 # Checked against real loop radii in Stage 3 (see docs/decisions.md).
 CLIP_BOX = BBox(min_lon=-2.2, min_lat=51.05, max_lon=-0.30, max_lat=51.90)
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "osm"
-
-
-def county_url(county: str) -> str:
-    return f"{GEOFABRIK_BASE}/{county}-latest.osm.pbf"
 
 
 @dataclass(frozen=True)
@@ -54,8 +43,8 @@ class Paths:
         return self.root / "downloads"
 
     @property
-    def merged(self) -> Path:
-        return self.root / "merged.osm.pbf"
+    def source(self) -> Path:
+        return self.downloads / f"{SOURCE_NAME}-latest.osm.pbf"
 
     @property
     def clipped(self) -> Path:

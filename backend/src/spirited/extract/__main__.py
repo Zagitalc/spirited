@@ -1,6 +1,6 @@
 """Command line for the extract pipeline.
 
-uv run python -m spirited.extract all       # fetch, merge, clip, filter
+uv run python -m spirited.extract all       # fetch, clip, filter
 uv run python -m spirited.extract filter    # re-run only the safety filter
 """
 
@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import argparse
 
-from spirited.extract.clip import clip, merge
+from spirited.extract.clip import clip
 from spirited.extract.fetch import fetch
 from spirited.extract.roadfilter_pbf import filter_file, write_report
 from spirited.region import DEFAULT_PATHS, Paths
 
-STEPS = ("fetch", "merge", "clip", "filter")
+STEPS = ("fetch", "clip", "filter")
 
 
 def run_filter(paths: Paths) -> None:
@@ -38,8 +38,6 @@ def main(argv: list[str] | None = None) -> None:
         print(f"== {step}")
         if step == "fetch":
             fetch(paths, force=args.force)
-        elif step == "merge":
-            merge(paths)
         elif step == "clip":
             clip(paths)
         else:
