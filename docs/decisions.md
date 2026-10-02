@@ -3,6 +3,97 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
+## 2026-10-02: Unclassified roads without a surface tag are never recommended
+
+**Decision.** In a corridor's confidence, the surface factor for an unclassified way
+with no paved `surface` tag is 0.55 instead of 0.9. That alone puts a corridor made of
+such ways below the 0.6 cut-off, so it is still scored and routable but never
+recommended for itself. Other classes without a surface tag keep the 0.9 factor.
+
+**Why.** The project's safety rule says missing surface data on minor roads is suspect
+and low-confidence segments are excluded from recommendations. The first build applied
+only the 0.9 factor, so no corridor fell below the cut-off and the rule had no effect:
+Mill Lane, tagged with nothing but `highway=unclassified` and a name, scored in the
+90s. The Stage 0 filter lets such roads into the routing graph when they have a name;
+this keeps them out of what Spirited recommends.
+
+**Cost.** Good lanes that simply lack a surface tag drop out of recommendations. The
+reference roads will show how many; adding `surface=asphalt` in OSM brings them back.
+
+## 2026-10-02: Narrow lanes score lower
+
+**Decision.** A corridor's score is multiplied by `1 - 0.5 × narrowness`, where
+narrowness is the length-weighted share of road that is narrow. A way counts as
+narrow (1) when it is two-way and tagged `lanes=1` or a `width`/`est_width` under
+5 m, and a whole corridor counts as narrow when it has a `highway=passing_place` node.
+An unclassified way with no lanes or width tag counts as possibly narrow (0.5), so its
+score drops by a quarter. A tag showing two lanes or a width of 5 m or more clears it.
+
+**Why.** In the first real build, a road LonZac knows as twisty and semi single-track
+ranked near the top, because the score rewarded its bends and knew nothing about its
+width. Its OSM tags were only `highway=unclassified`, `oneway=no` and
+`surface=asphalt`, which is typical: most lanes have no width tag, so tags alone would
+miss them. In England most single-track roads are unclassified, while B roads are
+nearly always two lanes, so the road class is the best remaining signal.
+
+**Cost.** Good, wide unclassified roads without a lanes tag are marked down too. The
+penalty is not part of the confidence value; a tag showing two lanes removes it.
+
+## 2026-10-01: Road scoring (Stage 2)
+
+**Decision.** Roads are scored offline in Python from `region-filtered.osm.pbf` and
+written to `backend/data/scores.sqlite`, one row per corridor plus a table from OSM
+way id to corridor. A corridor is a run of ways with the same ref (or name), highway
+class and eligibility, joined where exactly two of them meet. Unlabelled ways join
+only where no other road meets them; roundabouts never join.
+
+Residential, living street, service and motorway roads, slip roads, roundabouts and
+roads at 30 mph or less get no score. The speed limit comes from, in order: a
+`maxspeed` tag; a national-limit tag (`maxspeed=national`, `maxspeed:type`,
+`source:maxspeed`); `lit=yes` on a non-trunk road (30 mph); being more than half
+inside a settlement (30 mph); otherwise national speed limit, assumed.
+
+Each eligible corridor gets six components from 0 to 1 and a score out of 100:
+
+| Component | Weight | Measure |
+| --- | --- | --- |
+| Curvature | 0.30 | Metres per km inside bends of radius < 150 m lasting >= 60 m (geometry resampled every 10 m, radius measured across 40 m); full marks at 250 m/km |
+| Road class | 0.15 | tertiary 1.0, secondary 0.9, unclassified 0.9, primary 0.5, trunk 0.2 |
+| Speed limit | 0.15 | 40 mph 0.3, 50 mph 0.7, 60 mph 1.0, 70 mph 0.8 |
+| Junctions | 0.15 | Side roads per km inside the corridor, signals and roundabouts double; 1.0 at <= 2/km, 0 at >= 10/km |
+| Settlement | 0.15 | Share inside `landuse` residential/retail/commercial or near a `place` node (village 400 m, hamlet 150 m); 1.0 at <= 10%, 0 at >= 60% |
+| Elevation | 0.10 | Climb per km from Valhalla heights every 50 m, median-filtered, averaged over 300 m and with a 3 m dead band; full marks at 15 m/km |
+
+Each component also has a confidence. Speed: 1.0 tagged, 0.6 from lighting or a
+settlement, 0.3 assumed. Curvature: 1.0 up to 50 m mean node spacing, falling to 0.5
+at 200 m. Settlement: 0.9, or 0.6 when a place node is the only evidence. Junctions
+0.9, road class 1.0, elevation 0.6 (0 without heights). The corridor confidence is the
+weighted mean, multiplied by 0.9 for the share of the corridor whose surface is
+presumed paved rather than tagged. Corridors below 0.6 confidence, or shorter than
+1 km, are stored but not recommended.
+
+**Why.** OSM splits roads at arbitrary points, so curvature measured per way would cut
+bends in half; joining ways first fixes that. Scoring OSM ways rather than Valhalla
+edges keeps the scoring testable without a server, uses OSM's own geometry rather
+than Valhalla's simplified shapes, and Stage 3 can still map any route back to
+corridors through the way ids from `trace_attributes`. The speed limit gates
+everything else, which is why its inference is explicit and its source is stored.
+
+The elevation smoothing exists because Stage 1 measured 428 m of climbing between
+Reading and Newbury from raw heights. On a synthetic test, 10 km of flat road with
+4 m of noise gives over 300 m of raw climb and under 25 m after smoothing, while a
+rolling profile with about 70 m of real climb keeps more than three quarters of it.
+
+Two changes from the approved plan. Slip roads and roundabouts were added to the
+roads that never score: a roundabout is a 20 m radius circle and would otherwise top
+the curvature scale. And the curvature confidence floor was raised from 0.3 to 0.5,
+because straight roads are legitimately drawn with few nodes and the original curve
+marked every straight A road as low-confidence.
+
+**Revisit when** the reference roads are ranked (`make evaluate`). Every weight and
+threshold above is a first guess. The confidence threshold may also move once the
+first real build shows how much of the region has an assumed speed limit.
+
 ## 2026-10-01: A generated UK boundary for Valhalla
 
 **Decision.** The last step of the extract pipeline adds one administrative

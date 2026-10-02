@@ -1,7 +1,7 @@
 # Thin wrappers. Each target is one command you can also run by hand,
 # so nothing here is needed on a machine without make.
 
-.PHONY: backend-install backend-test backend-lint backend-run extract routing-data routing routing-rebuild routing-test android
+.PHONY: backend-install backend-test backend-lint backend-run extract routing-data routing routing-rebuild routing-test scores evaluate android
 
 backend-install:
 	cd backend && uv sync
@@ -33,6 +33,14 @@ routing-rebuild: routing-data
 
 routing-test:
 	cd backend && uv run pytest -q -m valhalla
+
+# Score every road (needs Valhalla running for heights), then rank the reference
+# roads in backend/data/reference_roads.json.
+scores:
+	cd backend && uv run python -m spirited.scoring build
+
+evaluate:
+	cd backend && uv run python -m spirited.scoring evaluate
 
 android:
 	cd android && ./gradlew spotlessCheck assembleDebug

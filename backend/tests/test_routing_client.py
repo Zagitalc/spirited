@@ -39,6 +39,9 @@ def fake_valhalla(request: httpx.Request) -> httpx.Response:
             200,
             json={"edges": [{"way_id": way, "names": ["A4", "Bath Road"], "length": 1.5}]},
         )
+    if request.url.path == "/height" and "shape" in body:
+        assert body["range"] is False
+        return httpx.Response(200, json={"height": [10.0 * i for i in range(len(body["shape"]))]})
     if request.url.path == "/height":
         assert body["range"] is True
         return httpx.Response(200, json={"range_height": [[0, 40.0], [30, 45.5], [60, None]]})
@@ -77,3 +80,22 @@ def test_errors_are_raised_with_valhallas_message(client: ValhallaClient) -> Non
 def test_a_route_needs_two_points(client: ValhallaClient) -> None:
     with pytest.raises(ValueError):
         client.route([(51.4, -1.3)])
+
+
+def test_heights_at_points(client: ValhallaClient) -> None:
+    assert client.heights([(51.4, -1.0), (51.41, -1.0)]) == [0.0, 10.0]
+    assert client.heights([]) == []
+
+
+def test_build_asks_for_heights_in_batches(client: ValhallaClient) -> None:
+    import numpy as np
+
+    from spirited.scoring.build import valhalla_heights
+
+    lookup = valhalla_heights(client, batch=3)
+    samples = [np.array([[-1.0, 51.4]] * 4), np.array([[-1.0, 51.4]] * 2)]
+    first, second = lookup(samples)
+    assert first is not None and second is not None
+    # Batches of 3: [0, 10, 20] then [0, 10, 20], split back into 4 and 2.
+    assert first.tolist() == [0.0, 10.0, 20.0, 0.0]
+    assert second.tolist() == [10.0, 20.0]

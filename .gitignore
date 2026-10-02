@@ -27,6 +27,8 @@ build/
 *.osm
 *.osm.bz2
 backend/data/osm/
+backend/data/scores.sqlite
+backend/data/*.building
 routing/custom_files/*
 !routing/custom_files/.gitkeep
 

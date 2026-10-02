@@ -1,0 +1,142 @@
+{
+  "how_to_fill_in": [
+    "Give each road a name you would recognise, such as its number and the places at each end.",
+    "verdict is 'like' or 'dislike'. 'why' is a sentence in your own words.",
+    "from and to are two points near the ends of the stretch you mean, as decimal degrees.",
+    "In Google Maps on a computer, right-click on the road and click the coordinates to copy them. On a phone, long-press to drop a pin and copy the coordinates shown.",
+    "Keep each stretch on one road and between about 3 and 15 km long.",
+    "Entries whose name still starts with PLACEHOLDER are skipped."
+  ],
+  "roads": [
+    {
+      "name": "PLACEHOLDER: a road you like (1)",
+      "verdict": "like",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you like (2)",
+      "verdict": "like",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you like (3)",
+      "verdict": "like",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you like (4)",
+      "verdict": "like",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you like (5)",
+      "verdict": "like",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you dislike (1)",
+      "verdict": "dislike",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you dislike (2)",
+      "verdict": "dislike",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you dislike (3)",
+      "verdict": "dislike",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you dislike (4)",
+      "verdict": "dislike",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    },
+    {
+      "name": "PLACEHOLDER: a road you dislike (5)",
+      "verdict": "dislike",
+      "why": "",
+      "from": {
+        "lat": 0.0,
+        "lon": 0.0
+      },
+      "to": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    }
+  ]
+}

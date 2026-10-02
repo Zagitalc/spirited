@@ -120,6 +120,14 @@ class ValhallaClient:
     def way_ids(self, route: Route) -> set[int]:
         return {edge.way_id for edge in self.edges(route)}
 
+    def heights(self, points: list[LatLon]) -> list[float | None]:
+        """Terrain height in metres at each point, or None where there is no data."""
+        if not points:
+            return []
+        body = {"shape": [{"lat": lat, "lon": lon} for lat, lon in points], "range": False}
+        data = self._post("/height", body)
+        return [None if h is None else float(h) for h in data.get("height", [])]
+
     def elevation(self, route: Route, every_m: int = 30) -> list[tuple[float, float]]:
         """(distance along the route in metres, height in metres) every `every_m` metres."""
         body = {
