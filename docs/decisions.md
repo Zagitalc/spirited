@@ -20,12 +20,38 @@ loses a quarter of its score. A `width` tag of 5 m or more removes that. On the
 ten reference roads this one change puts all five liked roads above all five
 disliked ones, but by 1.8 points, so it needs checking on roads not used to find it.
 
-## 2026-10-02: Unclassified roads without a surface tag are never recommended
+## 2026-10-02: Dual carriageways never score; bare tertiary roads are not trusted
 
-**Decision.** In a corridor's confidence, the surface factor for an unclassified way
-with no paved `surface` tag is 0.55 instead of 0.9. That alone puts a corridor made of
-such ways below the 0.6 cut-off, so it is still scored and routable but never
-recommended for itself. Other classes without a surface tag keep the 0.9 factor.
+**Decision.** Two rules, both from the 16 reference roads.
+- A trunk or primary road tagged `oneway`, or any road tagged `dual_carriageway=yes` or
+  `expressway=yes`, is ineligible, reason `dual_carriageway`. OSM draws a dual
+  carriageway as two one-way ways, so the A3290 (`dual_carriageway=yes`, 70 mph) and the
+  A4 at Reading (`oneway=yes`, 40 mph) both qualify. One-way secondary and tertiary
+  roads are left alone: they are rare and usually a village street.
+- A tertiary way with no paved `surface` tag and no speed limit tag (so the speed is
+  assumed) gets the 0.55 factor, as an unclassified road does, and is not recommended.
+  Sonning Common Road, disliked as single track, has only `highway=tertiary` and a name;
+  the liked Brimpton Road and Goring Lane have `lanes=2`, a surface and a speed.
+
+**Why.** Both disliked kinds scored well above liked roads: the A3290 at 50.6 and
+Sonning at 63.7. The first is two carriageways, which is not the drive Spirited is
+for; the second is a road nobody has surveyed, and the safety rule is to include on
+evidence.
+
+**Cost.** The second rule drops part of the 894 km of tertiary road with no surface tag;
+the build summary shows how much. A tertiary road with a speed tag but no surface tag
+stays in. Tertiary roads can be single track while tagged like any other, so this rule
+catches only the unsurveyed ones, not single-track roads in general.
+
+## 2026-10-02: Unclassified roads are not recommended without evidence
+
+**Decision.** In a corridor's confidence, the surface factor for an unclassified way is
+0.55 unless the way has both a paved `surface` tag and a `width` or `est_width` of at
+least 5 m. That alone puts a corridor made of such ways below the 0.6 cut-off, so it is
+still scored and routable but never recommended for itself. Other classes without a
+surface tag keep the 0.9 factor. (The first version only asked for a surface tag; the
+reference roads showed that five disliked single-track lanes carry one, and LonZac
+asked for unclassified roads to be excluded by default.)
 
 **Why.** The project's safety rule says missing surface data on minor roads is suspect
 and low-confidence segments are excluded from recommendations. The first build applied
@@ -34,8 +60,10 @@ Mill Lane, tagged with nothing but `highway=unclassified` and a name, scored in 
 90s. The Stage 0 filter lets such roads into the routing graph when they have a name;
 this keeps them out of what Spirited recommends.
 
-**Cost.** Good lanes that simply lack a surface tag drop out of recommendations. The
-reference roads will show how many; adding `surface=asphalt` in OSM brings them back.
+**Cost.** Good lanes drop out of recommendations unless OSM records their width: the
+liked Warren Row Road is one. Wrongly dropping a good lane loses a suggestion; wrongly
+recommending a single-track lane is the failure that matters. Adding `surface=asphalt`
+and `width` in OSM brings a lane back.
 
 ## 2026-10-02: Narrow lanes score lower
 

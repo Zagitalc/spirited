@@ -9,8 +9,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from spirited.scoring import build as build_module
 from spirited.scoring.build import build, summary
 from spirited.scoring.geometry import Coords, to_lonlat
+from spirited.scoring.speed import SpeedSource
 
 
 class MapWriter:
@@ -190,3 +192,29 @@ def test_an_unclassified_road_without_a_surface_tag_is_never_recommended(
     assert lane["surface_factor"] == pytest.approx(0.55)
     assert lane["confidence"] < 0.6
     assert lane["recommendable"] == 0
+
+
+@pytest.mark.parametrize(
+    ("tags", "factor"),
+    [
+        ({"highway": "unclassified"}, 0.55),
+        ({"highway": "unclassified", "surface": "asphalt"}, 0.55),
+        ({"highway": "unclassified", "surface": "asphalt", "lanes": "2"}, 0.55),
+        ({"highway": "unclassified", "width": "5.5"}, 0.55),
+        ({"highway": "unclassified", "surface": "asphalt", "width": "5.5"}, 1.0),
+        ({"highway": "tertiary"}, 0.9),
+        ({"highway": "tertiary", "surface": "asphalt"}, 1.0),
+    ],
+)
+def test_an_unclassified_road_needs_a_paved_surface_and_a_width_to_be_trusted(
+    tags: dict[str, str], factor: float
+) -> None:
+    assert build_module._surface_factor(tags, SpeedSource.TAGGED) == pytest.approx(factor)
+
+
+def test_a_tertiary_road_with_no_surface_and_no_speed_tag_is_not_trusted() -> None:
+    bare = {"highway": "tertiary", "name": "Sonning Common Road"}
+    assert build_module._surface_factor(bare, SpeedSource.ASSUMED) == pytest.approx(0.55)
+    assert build_module._surface_factor(bare, SpeedSource.TAGGED) == pytest.approx(0.9)
+    paved = {**bare, "surface": "asphalt"}
+    assert build_module._surface_factor(paved, SpeedSource.ASSUMED) == pytest.approx(1.0)

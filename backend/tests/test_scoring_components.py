@@ -140,3 +140,19 @@ def test_narrow_factor_scales_with_share() -> None:
     assert c.narrow_factor(0) == 1
     assert c.narrow_factor(1) == pytest.approx(c.NARROW_SCORE_FACTOR)
     assert c.narrow_factor(0.5) == pytest.approx(0.75)
+
+
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        ({"highway": "primary", "oneway": "yes", "ref": "A4"}, True),
+        ({"highway": "trunk", "oneway": "-1"}, True),
+        ({"highway": "primary", "dual_carriageway": "yes"}, True),
+        ({"highway": "primary", "expressway": "yes"}, True),
+        ({"highway": "primary", "ref": "A329"}, False),
+        ({"highway": "tertiary", "oneway": "yes"}, False),
+        ({"highway": "secondary", "oneway": "yes"}, False),
+    ],
+)
+def test_dual_carriageway_detection(tags: dict[str, str], expected: bool) -> None:
+    assert c.is_dual_carriageway(tags) is expected

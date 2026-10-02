@@ -59,6 +59,7 @@ class Ineligible(StrEnum):
     SLIP_ROAD = "slip_road"
     SPEED_LIMIT = "speed_limit"
     ROUNDABOUT = "roundabout"
+    DUAL_CARRIAGEWAY = "dual_carriageway"
 
 
 # Residential, living_street and service roads, and motorways, never score. Slip
@@ -72,6 +73,18 @@ SCORED_CLASSES: Mapping[str, float] = {
 }
 
 MAX_EXCLUDED_MPH = 30.0
+
+
+def is_dual_carriageway(tags: Mapping[str, str]) -> bool:
+    """A dual carriageway is drawn as two one-way ways, so a one-way trunk or primary
+    road is one; `dual_carriageway` and `expressway` tags say so directly."""
+    if tags.get("dual_carriageway") == "yes" or tags.get("expressway") == "yes":
+        return True
+    return tags.get("highway") in ("trunk", "primary") and tags.get("oneway") in (
+        "yes",
+        "1",
+        "-1",
+    )
 
 
 def ineligible_reason(highway: str, mph: float) -> Ineligible | None:

@@ -18,6 +18,7 @@ from spirited.scoring.evaluate import (
     format_report,
     headline,
     load_references,
+    recommendation_line,
     summarise,
 )
 from spirited.scoring.geometry import to_lonlat
@@ -35,11 +36,10 @@ def store(tmp_path: Path) -> ScoreStore:
     return ScoreStore(target)
 
 
-def test_the_committed_file_is_all_placeholders() -> None:
+def test_the_committed_file_has_liked_and_disliked_roads() -> None:
     roads = load_references(REFERENCE_PATH)
-    assert len(roads) == 10
     assert {r.verdict for r in roads} == {"like", "dislike"}
-    assert all(r.is_placeholder for r in roads)
+    assert len({r.name for r in roads}) == len(roads)
 
 
 def test_a_route_on_the_b_road_gets_its_score(store: ScoreStore) -> None:
@@ -151,3 +151,19 @@ def test_detail_shows_corridors_bends_by_radius_and_climb(store: ScoreStore) -> 
     assert "https://www.openstreetmap.org/way/100" in text
     assert "<300 m:" in text
     assert "climb per km" in text
+
+
+def test_recommendation_line_counts_roads_with_most_of_the_route_recommendable() -> None:
+    def report(verdict: str, low: float, scored: float = 1.0) -> RoadReport:
+        road = ReferenceRoad("r", verdict, "", (0, 0), (0, 0))
+        return RoadReport(road, low_confidence_share=low, scored_share=scored)
+
+    reports = [
+        report("like", 0.0),
+        report("like", 0.6),
+        report("dislike", 1.0),
+        report("dislike", 0.0, scored=0.0),
+    ]
+    assert recommendation_line(reports) == (
+        "The app would recommend 1 of 2 liked roads and 0 of 2 disliked roads."
+    )

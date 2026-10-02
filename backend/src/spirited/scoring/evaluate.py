@@ -202,6 +202,20 @@ def headline(reports: Iterable[RoadReport]) -> str:
     )
 
 
+def recommendation_line(reports: Iterable[RoadReport]) -> str:
+    """How many liked and disliked roads the app would recommend: those with at least
+    half of the route in recommendable corridors. Unscored stretches (a dual carriageway)
+    count against a road, as they would on the drive, and a disliked road that is not
+    recommended is handled correctly whatever its score."""
+    usable = [r for r in reports if not r.error]
+    out = []
+    for verdict in ("like", "dislike"):
+        roads = [r for r in usable if r.road.verdict == verdict]
+        kept = sum(r.scored_share - r.low_confidence_share >= 0.5 for r in roads)
+        out.append(f"{kept} of {len(roads)} {verdict}d roads")
+    return f"The app would recommend {out[0]} and {out[1]}."
+
+
 _SHORT = {
     Component.CURVATURE: "curve",
     Component.ROAD_CLASS: "class",
@@ -230,7 +244,7 @@ def format_report(reports: list[RoadReport]) -> str:
             f"  {r.score:5.1f}  {r.confidence:4.2f}  {values}  {r.scored_share:6.0%}"
             f"  {r.low_confidence_share:8.0%}  {label} ({share:.0%})"
         )
-    lines += ["", headline(reports)]
+    lines += ["", headline(reports), recommendation_line(reports)]
 
     notes = []
     for r in ranked:

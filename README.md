@@ -148,8 +148,8 @@ whereas routing someone down a farm track costs a lot more.
 ## How a road is scored
 
 Roads are joined into corridors: runs of the same road between junctions where it
-changes. Residential roads, slip roads, roundabouts, motorways and anything with a
-speed limit of 30 mph or less get no score. Everything else is scored from 0 to 100 on
+changes. Residential roads, slip roads, roundabouts, motorways, dual carriageways and
+anything with a speed limit of 30 mph or less get no score. Everything else is scored from 0 to 100 on
 six things:
 
 | Part | Weight | What it rewards |
@@ -168,9 +168,10 @@ not count, since it is often a default on single-track lanes.
 
 Every score comes with a confidence from 0 to 1, which drops when a speed limit is
 guessed, a road's geometry is sparse, a village is known only by its name on the map,
-or a surface is presumed rather than tagged. An unclassified road with no surface tag
-always falls below the cut-off, because missing surface data on minor roads is treated
-as suspect. Corridors below 0.6, or shorter than
+or a surface is presumed rather than tagged. An unclassified road
+falls below the cut-off unless it has a paved surface tag and a width of at least 5 m,
+because most single-track lanes in England are unclassified and OpenStreetMap rarely
+records their width. Good lanes are dropped along with the bad ones. Corridors below 0.6, or shorter than
 1 km, are not recommended. The weights are a first guess, to be tuned against a set of
 reference roads with known verdicts (see `docs/decisions.md`).
 

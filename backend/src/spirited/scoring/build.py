@@ -58,10 +58,12 @@ SETTLEMENT_CONFIDENCE = {"landuse": 0.9, "place_only": 0.6}
 ELEVATION_CONFIDENCE = 0.6
 # A road kept by the filter only because its class is presumed paved.
 PRESUMED_SURFACE_FACTOR = 0.9
-# An unclassified road with no surface tag is suspect (the project's safety rule).
-# This factor alone takes it below MIN_CONFIDENCE, so such a road can be routed over
-# but never recommended for itself.
-UNTAGGED_MINOR_SURFACE_FACTOR = 0.55
+# An unclassified road is excluded by default and included on evidence (the project's
+# safety rule): it needs a paved surface tag and a width of at least 5 m. A tertiary
+# road needs a surface tag or a speed limit tag. This factor
+# alone takes it below MIN_CONFIDENCE, so such a road can be routed over but never
+# recommended for itself.
+UNEVIDENCED_MINOR_FACTOR = 0.55
 
 HeightSource = Callable[[Sequence[Coords]], list[NDArray[np.float64] | None]]
 """Takes (lon, lat) sample points per corridor and returns heights in metres per corridor."""
@@ -96,6 +98,7 @@ _WAY_TAGS = (
     "lit",
     "junction",
     "dual_carriageway",
+    "expressway",
     "surface",
     "lanes",
     "width",
@@ -190,6 +193,8 @@ def way_facts(way: RawWay, region: Region) -> WayFacts:
     place = settlement(xy, region)
     speed = speed_limit(way.tags, in_settlement=place.share > 0.5)
     ineligible = c.ineligible_reason(way.tags["highway"], speed.mph)
+    if ineligible is None and c.is_dual_carriageway(way.tags):
+        ineligible = Ineligible.DUAL_CARRIAGEWAY
     if way.tags.get("junction") in ("roundabout", "circular"):
         ineligible = Ineligible.ROUNDABOUT
     return WayFacts(way, xy, length_m(xy), place, speed, ineligible)
@@ -339,7 +344,9 @@ def _score(
         "settlement_share": place.share,
         "climb_m_per_km": climb,
     }
-    item.surface_factor = _weighted((_surface_factor(f.way.tags), f.length_m) for f in members)
+    item.surface_factor = _weighted(
+        (_surface_factor(f.way.tags, f.speed.source), f.length_m) for f in members
+    )
     if any(node in region.passing_places for node in item.corridor.node_ids):
         narrow = 1.0
     else:
@@ -350,12 +357,15 @@ def _score(
     item.confidence = confidence * item.surface_factor
 
 
-def _surface_factor(tags: dict[str, str]) -> float:
-    if tags.get("surface") in PAVED_SURFACES:
-        return 1.0
-    if tags.get("highway") == "unclassified":
-        return UNTAGGED_MINOR_SURFACE_FACTOR
-    return PRESUMED_SURFACE_FACTOR
+def _surface_factor(tags: dict[str, str], speed_source: SpeedSource) -> float:
+    paved = tags.get("surface") in PAVED_SURFACES
+    highway = tags.get("highway")
+    if highway == "unclassified" and not (paved and c.narrowness(tags) == 0):
+        return UNEVIDENCED_MINOR_FACTOR
+    # A tertiary road with neither a surface nor a speed tag has not been surveyed.
+    if highway == "tertiary" and not paved and speed_source is SpeedSource.ASSUMED:
+        return UNEVIDENCED_MINOR_FACTOR
+    return 1.0 if paved else PRESUMED_SURFACE_FACTOR
 
 
 # --- heights from Valhalla ----------------------------------------------------
