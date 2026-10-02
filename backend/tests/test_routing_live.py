@@ -77,3 +77,10 @@ def test_excluded_list_contains_the_traps(excluded: dict[int, tuple[str, str]]) 
     # If these are missing, the trap routes above prove nothing.
     names = {name for _, name in excluded.values()}
     assert "The Ridgeway" in names
+
+
+def test_heights_cover_the_region(client: ValhallaClient) -> None:
+    # Scoring needs a height for every sample point, from Swindon to Guildford.
+    points = [READING, NEWBURY, WEST_ILSLEY, (51.5600, -1.7800), (51.2360, -0.5700)]
+    heights = client.heights(points)
+    assert all(h is not None and -10 < h < 400 for h in heights), heights

@@ -13,14 +13,15 @@ speed limit, how often you meet junctions and villages, and elevation change.
 
 ## Status
 
-Stage 1 of 5. The OSM extract pipeline, the road safety filter and car routing with
-Valhalla exist. There is no scoring, loop generation or usable app yet.
+Stage 2 of 5. The OSM extract pipeline, the road safety filter, car routing with
+Valhalla and a first version of road scoring exist. The scoring weights have not yet
+been checked against real roads. There is no loop generation or usable app yet.
 
 | Stage | What | State |
 | --- | --- | --- |
 | 0 | Foundations: structure, tooling, OSM extract | Done |
-| 1 | Routing with Valhalla | In progress |
-| 2 | Road scoring | Not started |
+| 1 | Routing with Valhalla | Done |
+| 2 | Road scoring | In progress |
 | 3 | Loop generation and HTTP API | Not started |
 | 4 | Android app | Not started |
 | 5 | Hosting and release | Not started |
@@ -28,7 +29,7 @@ Valhalla exist. There is no scoring, loop generation or usable app yet.
 ## Layout
 
 ```
-backend/   Python service: extract pipeline, road filter, later scoring and the API
+backend/   Python service: extract pipeline, road filter, scoring, later the API
 routing/   Valhalla configuration (from Stage 1)
 android/   Kotlin and Jetpack Compose client
 docs/      API contract, decisions log and data attribution
@@ -109,8 +110,21 @@ The second command prints the distance, time, the main roads used and the climbi
 and writes a GPX file you can open in any map viewer. See `routing/README.md` for
 rebuilding after the map data changes.
 
-`make backend-test`, `make extract`, `make routing` and `make android` are shortcuts for the same
-commands.
+### Scoring
+
+With Valhalla running (it supplies the heights), from the repository root:
+
+```sh
+make scores         # scores every road and writes backend/data/scores.sqlite
+make evaluate       # ranks the roads in backend/data/reference_roads.json
+```
+
+`make evaluate` needs the reference roads filled in first: each is a road you like or
+dislike, given as two points near its ends. The report ranks them by score, shows
+each part of the score, and lists any roads nearby that the safety filter removed.
+
+`make backend-test`, `make extract`, `make routing`, `make scores` and `make android` are
+shortcuts for the same commands.
 
 ## Which roads Spirited will use
 
@@ -128,12 +142,46 @@ The last rule will drop some perfectly good country lanes that are simply under-
 in OpenStreetMap. That is deliberate: a missing lane costs a slightly worse loop,
 whereas routing someone down a farm track costs a lot more.
 
+## How a road is scored
+
+Roads are joined into corridors: runs of the same road between junctions where it
+changes. Residential roads, slip roads, roundabouts, motorways and anything with a
+speed limit of 30 mph or less get no score. Everything else is scored from 0 to 100 on
+six things:
+
+| Part | Weight | What it rewards |
+| --- | --- | --- |
+| Curvature | 30% | Bends tighter than 150 m radius that last at least 60 m; single kinks don't count |
+| Road class | 15% | B and C roads over A roads, and A roads over trunk roads |
+| Speed limit | 15% | National speed limit over 50 and 40 mph |
+| Junctions | 15% | Few side roads, traffic lights and roundabouts per km |
+| Settlements | 15% | Little of the road inside towns and villages |
+| Elevation | 10% | Rolling roads, from heights smoothed over 300 m |
+
+A road known to be single track or narrower than 5 m has its score halved. An
+unclassified road with no width information loses a quarter, because most narrow
+lanes are unclassified and few are tagged as narrow.
+
+Every score comes with a confidence from 0 to 1, which drops when a speed limit is
+guessed, a road's geometry is sparse, a village is known only by its name on the map,
+or a surface is presumed rather than tagged. An unclassified road with no surface tag
+always falls below the cut-off, because missing surface data on minor roads is treated
+as suspect. Corridors below 0.6, or shorter than
+1 km, are not recommended. The weights are a first guess, to be tuned against a set of
+reference roads with known verdicts (see `docs/decisions.md`).
+
 ## Limitations
 
 - The map data is only as good as OpenStreetMap. Surface and access tags are
   incomplete, which is why the filter is cautious.
 - Coverage is limited to a box around Berkshire, from roughly Swindon to the western
   edge of London and from Oxford to Guildford.
+- Many minor roads have no speed limit in OpenStreetMap. An untagged road outside a
+  village is assumed to be national speed limit, with low confidence.
+- Heights come from 30 m terrain data, which cannot see cuttings, embankments or
+  bridges. They are smoothed heavily, so short sharp climbs are underrated.
+- The scoring has not yet been checked against enough real roads to trust its
+  weights.
 - Nothing has been tested on a phone yet.
 
 ## Data and licences
