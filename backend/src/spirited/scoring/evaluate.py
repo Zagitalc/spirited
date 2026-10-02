@@ -25,10 +25,11 @@ from osmium.filter import KeyFilter
 from osmium.osm import Way
 
 from spirited.region import DATA_DIR
-from spirited.routing.client import Edge, ValhallaClient
+from spirited.routing.client import Edge, Route, ValhallaClient
 from spirited.routing.polyline import LatLon
+from spirited.scoring import components as c
 from spirited.scoring.components import Component
-from spirited.scoring.geometry import to_xy
+from spirited.scoring.geometry import length_m, resample, to_xy
 from spirited.scoring.store import ScoreStore
 
 REFERENCE_PATH = DATA_DIR.parent / "reference_roads.json"
@@ -84,6 +85,7 @@ class RoadReport:
     low_confidence_share: float = 0.0
     ineligible_km: dict[str, float] = field(default_factory=dict)
     nearby_excluded: list[tuple[int, str, str]] = field(default_factory=list)
+    detail: str = ""
     error: str = ""
 
 
@@ -250,19 +252,96 @@ def format_report(reports: list[RoadReport]) -> str:
     return "\n".join(lines)
 
 
+# --- detail: what lies behind a road's score --------------------------------------
+
+DETAIL_RADII_M = (100.0, 150.0, 200.0, 300.0)
+
+
+def bends_by_radius(
+    points: Sequence[LatLon], radii: Sequence[float] = DETAIL_RADII_M
+) -> dict[float, float]:
+    """Metres per km inside sustained bends for several bend radii, from a route's shape.
+
+    The score counts only bends under c.BEND_RADIUS_M. Showing wider radii tells us
+    whether a road is flowing rather than tight, which that single threshold cannot.
+    """
+    xy = to_xy(np.array([(lon, lat) for lat, lon in points]))
+    km = length_m(xy) / 1000
+    resampled = resample(xy, c.STEP_M)
+    return {r: (c.bend_metres(resampled, r) / km if km else 0.0) for r in radii}
+
+
+def detail_text(
+    road: ReferenceRoad,
+    route: Route,
+    edges: Sequence[Edge],
+    store: ScoreStore,
+    heights: Sequence[tuple[float, float]],
+) -> str:
+    """The corridors a route uses, its bends at several radii, and its climb."""
+    rows = store.corridors_for_ways(e.way_id for e in edges)
+    km_on: defaultdict[int, float] = defaultdict(float)
+    order: list[int] = []
+    for edge in edges:
+        row = rows.get(edge.way_id)
+        corridor_id = row["id"] if row else -edge.way_id
+        if corridor_id not in km_on:
+            order.append(corridor_id)
+        km_on[corridor_id] += edge.length_km
+    by_id = {row["id"]: row for row in rows.values()}
+
+    lines = [f"{road.name} ({road.verdict}): {road.why}".rstrip(": ")]
+    lines.append("  corridors on the route (km on route, then the whole corridor's figures):")
+    for corridor_id in order:
+        row = by_id.get(corridor_id)
+        km = km_on[corridor_id]
+        if row is None:
+            lines.append(f"    {km:4.1f} km  not in scores (way {-corridor_id})")
+            continue
+        status = row["ineligible"] or ("recommended" if row["recommendable"] else "low confidence")
+        lines.append(
+            f"    {km:4.1f} km  {row['label'] or '(unnamed)'} ({row['highway']}), "
+            f"score {row['score']:.0f}, conf {row['confidence'] or 0:.2f}, {status}, "
+            f"narrow {row['narrow_share'] or 0:.1f}, surface x{row['surface_factor'] or 0:.2f}, "
+            f"{row['mph']:.0f} mph ({row['speed_source']}), "
+            f"https://www.openstreetmap.org/way/{corridor_id}"
+        )
+    bends = bends_by_radius(route.points)
+    lines.append(
+        "  bend metres per km by radius: "
+        + ", ".join(f"<{r:.0f} m: {v:.0f}" for r, v in bends.items())
+        + f"   (the score uses <{c.BEND_RADIUS_M:.0f} m, full marks at "
+        f"{c.FULL_CURVATURE_M_PER_KM:.0f})"
+    )
+    if len(heights) >= 3 and route.distance_km:
+        values = [h for _, h in heights]
+        smooth = c.climb_m(c.smooth_heights(values, c.HEIGHT_STEP_M)) / route.distance_km
+        raw = c.climb_m(values, 0.0) / route.distance_km
+        lines.append(
+            f"  climb per km: {smooth:.1f} m smoothed (scored), {raw:.1f} m raw; "
+            f"{len(values)} height samples, full marks at {c.FULL_CLIMB_M_PER_KM:.0f}"
+        )
+    return "\n".join(lines)
+
+
 def evaluate(
     roads: list[ReferenceRoad],
     client: ValhallaClient,
     store: ScoreStore,
     excluded: ExcludedIndex | None,
+    detail: bool = False,
 ) -> list[RoadReport]:
     reports = []
     for road in roads:
         try:
             route = client.route([road.start, road.end])
-            report = summarise(road, client.edges(route), store)
+            edges = client.edges(route)
+            report = summarise(road, edges, store)
             if excluded is not None:
                 report.nearby_excluded = excluded.near(route.points)
+            if detail:
+                heights = client.elevation(route, every_m=int(c.HEIGHT_STEP_M))
+                report.detail = detail_text(road, route, edges, store, heights)
         except Exception as error:  # report the road and carry on with the rest
             report = RoadReport(road, error=f"failed: {error}")
         reports.append(report)

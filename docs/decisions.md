@@ -3,6 +3,23 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
+## 2026-10-02: `lanes=2` does not show that an unclassified road is wide
+
+**Decision.** Only a `width` or `est_width` of 5 m or more clears the "possibly narrow"
+penalty on an unclassified road. A `lanes=2` tag no longer does.
+
+**Why.** The first reference-road run put Back Lane (Wasing to Woolhampton), a road
+LonZac disliked and confirmed on street view to be single track, above every road they
+liked. Its tags were `highway=unclassified`, `lanes=2`, `maxspeed=60 mph`,
+`surface=asphalt` and `source:name=OS-OpenData_StreetView`. The `lanes=2` tag
+cleared the narrow penalty. It looks like a default (two-way, so two lanes) rather than
+a measurement, and there is no way to tell the two apart from the tags.
+
+**Cost.** A genuinely two-lane unclassified road tagged `lanes=2` and nothing else now
+loses a quarter of its score. A `width` tag of 5 m or more removes that. On the
+ten reference roads this one change puts all five liked roads above all five
+disliked ones, but by 1.8 points, so it needs checking on roads not used to find it.
+
 ## 2026-10-02: Unclassified roads without a surface tag are never recommended
 
 **Decision.** In a corridor's confidence, the surface factor for an unclassified way
@@ -26,8 +43,9 @@ reference roads will show how many; adding `surface=asphalt` in OSM brings them 
 narrowness is the length-weighted share of road that is narrow. A way counts as
 narrow (1) when it is two-way and tagged `lanes=1` or a `width`/`est_width` under
 5 m, and a whole corridor counts as narrow when it has a `highway=passing_place` node.
-An unclassified way with no lanes or width tag counts as possibly narrow (0.5), so its
-score drops by a quarter. A tag showing two lanes or a width of 5 m or more clears it.
+An unclassified way with no width tag of 5 m or more counts as possibly narrow (0.5),
+so its score drops by a quarter. `lanes=2` does not clear it (see the 2026-10-02
+entry on `lanes=2` below).
 
 **Why.** In the first real build, a road LonZac knows as twisty and semi single-track
 ranked near the top, because the score rewarded its bends and knew nothing about its

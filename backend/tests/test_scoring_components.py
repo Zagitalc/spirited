@@ -125,7 +125,8 @@ def test_sparse_geometry_lowers_curvature_confidence() -> None:
         ({"highway": "tertiary", "lanes": "1", "oneway": "yes"}, 0),  # one side of a dual road
         ({"highway": "tertiary"}, 0),
         ({"highway": "unclassified"}, 0.5),  # possibly narrow: no evidence either way
-        ({"highway": "unclassified", "lanes": "2"}, 0),
+        ({"highway": "unclassified", "lanes": "2"}, 0.5),  # lanes=2 is often a default
+        ({"highway": "tertiary", "lanes": "2"}, 0),
         ({"highway": "unclassified", "width": "6"}, 0),
         ({"highway": "unclassified", "width": "12'"}, 0.5),  # feet are not parsed
         ({"highway": "unclassified", "lanes": "1"}, 1),

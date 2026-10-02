@@ -122,6 +122,9 @@ make evaluate       # ranks the roads in backend/data/reference_roads.json
 `make evaluate` needs the reference roads filled in first: each is a road you like or
 dislike, given as two points near its ends. The report ranks them by score, shows
 each part of the score, and lists any roads nearby that the safety filter removed.
+Add `--detail` (`cd backend && uv run python -m spirited.scoring evaluate --detail`) to
+also see, for each road, the corridors it uses with links to them on OpenStreetMap, its
+bends measured at several radii, and its climb.
 
 `make backend-test`, `make extract`, `make routing`, `make scores` and `make android` are
 shortcuts for the same commands.
@@ -159,8 +162,9 @@ six things:
 | Elevation | 10% | Rolling roads, from heights smoothed over 300 m |
 
 A road known to be single track or narrower than 5 m has its score halved. An
-unclassified road with no width information loses a quarter, because most narrow
-lanes are unclassified and few are tagged as narrow.
+unclassified road loses a quarter unless its width is tagged as 5 m or more, because
+most narrow lanes are unclassified and few are tagged as narrow. A `lanes=2` tag does
+not count, since it is often a default on single-track lanes.
 
 Every score comes with a confidence from 0 to 1, which drops when a speed limit is
 guessed, a road's geometry is sparse, a village is known only by its name on the map,

@@ -126,3 +126,28 @@ def test_bad_verdict_is_rejected(tmp_path: Path) -> None:
     path.write_text(json.dumps({"roads": [entry]}))
     with pytest.raises(ValueError, match="verdict"):
         load_references(path)
+
+
+def test_detail_shows_corridors_bends_by_radius_and_climb(store: ScoreStore) -> None:
+    import math
+
+    from spirited.routing.client import Route
+    from spirited.scoring.evaluate import bends_by_radius, detail_text
+
+    x = np.linspace(0, 3000, 301)
+    shape = np.column_stack([x, 40 * np.sin(2 * math.pi * x / 400)])
+    points = tuple((lat, lon) for lon, lat in to_lonlat(shape))
+    route = Route(3.4, 300, (), points)
+    edges = [Edge(100, ("B4009",), 1.7), Edge(101, ("B4009",), 1.7)]
+    heights = [(i * 50.0, 100 + 10 * math.sin(i / 10)) for i in range(60)]
+
+    bends = bends_by_radius(points)
+    assert bends[100.0] <= bends[150.0] <= bends[200.0] <= bends[300.0]
+    assert bends[150.0] > 250  # sustained 100 m radius bends
+
+    text = detail_text(ROAD, route, edges, store, heights)
+    assert "B4009 (secondary)" in text
+    assert "3.4 km" in text
+    assert "https://www.openstreetmap.org/way/100" in text
+    assert "<300 m:" in text
+    assert "climb per km" in text
