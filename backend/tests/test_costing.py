@@ -10,7 +10,7 @@ def test_profile_is_pinned() -> None:
         "service_penalty": 300,
         "use_ferry": 0.0,
         "ignore_access": False,
-        "use_highways": 0.5,
+        "use_highways": 0.0,
     }
 
 

@@ -18,6 +18,7 @@ from spirited.scoring.evaluate import (
     format_report,
     headline,
     load_references,
+    recommendation_line,
     summarise,
 )
 from spirited.scoring.geometry import to_lonlat
@@ -35,11 +36,10 @@ def store(tmp_path: Path) -> ScoreStore:
     return ScoreStore(target)
 
 
-def test_the_committed_file_is_all_placeholders() -> None:
+def test_the_committed_file_has_liked_and_disliked_roads() -> None:
     roads = load_references(REFERENCE_PATH)
-    assert len(roads) == 10
     assert {r.verdict for r in roads} == {"like", "dislike"}
-    assert all(r.is_placeholder for r in roads)
+    assert len({r.name for r in roads}) == len(roads)
 
 
 def test_a_route_on_the_b_road_gets_its_score(store: ScoreStore) -> None:
@@ -126,3 +126,44 @@ def test_bad_verdict_is_rejected(tmp_path: Path) -> None:
     path.write_text(json.dumps({"roads": [entry]}))
     with pytest.raises(ValueError, match="verdict"):
         load_references(path)
+
+
+def test_detail_shows_corridors_bends_by_radius_and_climb(store: ScoreStore) -> None:
+    import math
+
+    from spirited.routing.client import Route
+    from spirited.scoring.evaluate import bends_by_radius, detail_text
+
+    x = np.linspace(0, 3000, 301)
+    shape = np.column_stack([x, 40 * np.sin(2 * math.pi * x / 400)])
+    points = tuple((lat, lon) for lon, lat in to_lonlat(shape))
+    route = Route(3.4, 300, (), points)
+    edges = [Edge(100, ("B4009",), 1.7), Edge(101, ("B4009",), 1.7)]
+    heights = [(i * 50.0, 100 + 10 * math.sin(i / 10)) for i in range(60)]
+
+    bends = bends_by_radius(points)
+    assert bends[100.0] <= bends[150.0] <= bends[200.0] <= bends[300.0]
+    assert bends[150.0] > 250  # sustained 100 m radius bends
+
+    text = detail_text(ROAD, route, edges, store, heights)
+    assert "B4009 (secondary)" in text
+    assert "3.4 km" in text
+    assert "https://www.openstreetmap.org/way/100" in text
+    assert "<300 m:" in text
+    assert "climb per km" in text
+
+
+def test_recommendation_line_counts_roads_with_most_of_the_route_recommendable() -> None:
+    def report(verdict: str, low: float, scored: float = 1.0) -> RoadReport:
+        road = ReferenceRoad("r", verdict, "", (0, 0), (0, 0))
+        return RoadReport(road, low_confidence_share=low, scored_share=scored)
+
+    reports = [
+        report("like", 0.0),
+        report("like", 0.6),
+        report("dislike", 1.0),
+        report("dislike", 0.0, scored=0.0),
+    ]
+    assert recommendation_line(reports) == (
+        "The app would recommend 1 of 2 liked roads and 0 of 2 disliked roads."
+    )

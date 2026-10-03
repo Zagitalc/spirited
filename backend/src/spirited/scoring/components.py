@@ -59,6 +59,7 @@ class Ineligible(StrEnum):
     SLIP_ROAD = "slip_road"
     SPEED_LIMIT = "speed_limit"
     ROUNDABOUT = "roundabout"
+    DUAL_CARRIAGEWAY = "dual_carriageway"
 
 
 # Residential, living_street and service roads, and motorways, never score. Slip
@@ -72,6 +73,18 @@ SCORED_CLASSES: Mapping[str, float] = {
 }
 
 MAX_EXCLUDED_MPH = 30.0
+
+
+def is_dual_carriageway(tags: Mapping[str, str]) -> bool:
+    """A dual carriageway is drawn as two one-way ways, so a one-way trunk or primary
+    road is one; `dual_carriageway` and `expressway` tags say so directly."""
+    if tags.get("dual_carriageway") == "yes" or tags.get("expressway") == "yes":
+        return True
+    return tags.get("highway") in ("trunk", "primary") and tags.get("oneway") in (
+        "yes",
+        "1",
+        "-1",
+    )
 
 
 def ineligible_reason(highway: str, mph: float) -> Ineligible | None:
@@ -93,9 +106,9 @@ def _ramp(value: float, zero_at: float, one_at: float) -> float:
 # --- curvature ---------------------------------------------------------------
 
 
-def bend_metres(xy: Coords) -> float:
+def bend_metres(xy: Coords, radius_m: float = BEND_RADIUS_M) -> float:
     """Metres of road inside sustained bends, on geometry already resampled to STEP_M."""
-    tight = turning_radii(xy) < BEND_RADIUS_M
+    tight = turning_radii(xy) < radius_m
     total = 0.0
     run = 0
     for is_tight in [*tight.tolist(), False]:
@@ -226,20 +239,22 @@ def parse_width_m(value: str) -> float | None:
 
 def narrowness(tags: Mapping[str, str]) -> float:
     """1 when the tags say a two-way road is single track or too narrow to pass, 0.5
-    when it is an unclassified road with nothing to say either way, otherwise 0.
+    when it is an unclassified road with no width to show otherwise, otherwise 0.
 
-    Most lanes carry no width or lanes tag, but in England most single-track roads are
-    unclassified, so an untagged unclassified road counts as possibly narrow. One-way
-    roads are left out: one lane on each carriageway of a dual road is normal.
+    Most lanes carry no width tag, and in England most single-track roads are
+    unclassified, so an unclassified road counts as possibly narrow unless a width of
+    5 m or more is tagged. A `lanes=2` tag does not clear it: it is often added to
+    single-track lanes as a default (Back Lane, Wasing, is tagged `lanes=2` and is
+    single track). One-way roads are left out: one lane on each carriageway of a dual
+    road is normal.
     """
     if tags.get("oneway") in ("yes", "1", "-1"):
         return 0.0
-    lanes = tags.get("lanes", "")
     widths = [parse_width_m(tags.get(key, "")) for key in ("width", "est_width")]
     known = [w for w in widths if w is not None]
-    if lanes == "1" or any(w < NARROW_WIDTH_M for w in known):
+    if tags.get("lanes") == "1" or any(w < NARROW_WIDTH_M for w in known):
         return 1.0
-    if (lanes.isdigit() and int(lanes) >= 2) or known:
+    if known:
         return 0.0
     return POSSIBLY_NARROW if tags.get("highway") == "unclassified" else 0.0
 

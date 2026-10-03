@@ -19,7 +19,7 @@ AUTO_OPTIONS: dict[str, Any] = {
     "service_penalty": 300,
     "use_ferry": 0.0,
     "ignore_access": False,
-    "use_highways": 0.5,
+    "use_highways": 0.0,
 }
 
 

@@ -125,7 +125,8 @@ def test_sparse_geometry_lowers_curvature_confidence() -> None:
         ({"highway": "tertiary", "lanes": "1", "oneway": "yes"}, 0),  # one side of a dual road
         ({"highway": "tertiary"}, 0),
         ({"highway": "unclassified"}, 0.5),  # possibly narrow: no evidence either way
-        ({"highway": "unclassified", "lanes": "2"}, 0),
+        ({"highway": "unclassified", "lanes": "2"}, 0.5),  # lanes=2 is often a default
+        ({"highway": "tertiary", "lanes": "2"}, 0),
         ({"highway": "unclassified", "width": "6"}, 0),
         ({"highway": "unclassified", "width": "12'"}, 0.5),  # feet are not parsed
         ({"highway": "unclassified", "lanes": "1"}, 1),
@@ -139,3 +140,19 @@ def test_narrow_factor_scales_with_share() -> None:
     assert c.narrow_factor(0) == 1
     assert c.narrow_factor(1) == pytest.approx(c.NARROW_SCORE_FACTOR)
     assert c.narrow_factor(0.5) == pytest.approx(0.75)
+
+
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        ({"highway": "primary", "oneway": "yes", "ref": "A4"}, True),
+        ({"highway": "trunk", "oneway": "-1"}, True),
+        ({"highway": "primary", "dual_carriageway": "yes"}, True),
+        ({"highway": "primary", "expressway": "yes"}, True),
+        ({"highway": "primary", "ref": "A329"}, False),
+        ({"highway": "tertiary", "oneway": "yes"}, False),
+        ({"highway": "secondary", "oneway": "yes"}, False),
+    ],
+)
+def test_dual_carriageway_detection(tags: dict[str, str], expected: bool) -> None:
+    assert c.is_dual_carriageway(tags) is expected

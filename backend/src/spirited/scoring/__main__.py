@@ -57,8 +57,11 @@ def _evaluate(args: argparse.Namespace) -> int:
         if not client.is_up():
             print("Valhalla is not running: start it with `make routing`.", file=sys.stderr)
             return 1
-        reports = evaluate.evaluate(ready, client, store, excluded)
+        reports = evaluate.evaluate(ready, client, store, excluded, detail=args.detail)
     text = evaluate.format_report(reports)
+    if args.detail:
+        details = [r.detail for r in sorted(reports, key=lambda r: -r.score) if r.detail]
+        text += "\n\nDetail:\n\n" + "\n\n".join(details)
     print()
     print(text)
     if args.out:
@@ -83,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
     eval_cmd.add_argument("--refs", type=Path, default=evaluate.REFERENCE_PATH)
     eval_cmd.add_argument("--scores", type=Path, default=build.SCORES_PATH)
     eval_cmd.add_argument("--out", type=Path, help="also write the report to this file")
+    eval_cmd.add_argument(
+        "--detail",
+        action="store_true",
+        help="also list each road's corridors, bends at several radii, and climb",
+    )
     eval_cmd.add_argument(
         "--skip-nearby", action="store_true", help="skip the check for removed roads nearby"
     )

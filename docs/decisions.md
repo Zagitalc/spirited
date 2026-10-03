@@ -3,12 +3,102 @@
 Newest first. Each entry says what was decided, why, and what would make us
 revisit it.
 
-## 2026-10-02: Unclassified roads without a surface tag are never recommended
+## 2026-10-02: `lanes=2` does not show that an unclassified road is wide
 
-**Decision.** In a corridor's confidence, the surface factor for an unclassified way
-with no paved `surface` tag is 0.55 instead of 0.9. That alone puts a corridor made of
-such ways below the 0.6 cut-off, so it is still scored and routable but never
-recommended for itself. Other classes without a surface tag keep the 0.9 factor.
+**Decision.** Only a `width` or `est_width` of 5 m or more clears the "possibly narrow"
+penalty on an unclassified road. A `lanes=2` tag no longer does.
+
+**Why.** The first reference-road run put Back Lane (Wasing to Woolhampton), a road
+LonZac disliked and confirmed on street view to be single track, above every road they
+liked. Its tags were `highway=unclassified`, `lanes=2`, `maxspeed=60 mph`,
+`surface=asphalt` and `source:name=OS-OpenData_StreetView`. The `lanes=2` tag
+cleared the narrow penalty. It looks like a default (two-way, so two lanes) rather than
+a measurement, and there is no way to tell the two apart from the tags.
+
+**Cost.** A genuinely two-lane unclassified road tagged `lanes=2` and nothing else now
+loses a quarter of its score. A `width` tag of 5 m or more removes that. On the
+ten reference roads this one change puts all five liked roads above all five
+disliked ones, but by 1.8 points, so it needs checking on roads not used to find it.
+
+## 2026-10-02: How loops are generated (Stage 3)
+
+**Decision.** A loop is built from waypoints chosen on well-scored roads, not found by
+searching the road network.
+1. Ask Valhalla for the area reachable in 40% of the target time (an isochrone) and take
+   points from the score database that lie inside it: one every 4 km along each
+   recommendable corridor of at least 2 km, best-scored corridors first, spread
+   around the start by bearing, at least 3 km apart, at most 16 of them and 3 per
+   corridor.
+2. Use one time matrix call to estimate every loop of two (and, from a 55-minute
+   target, three) of those points, and keep up to 60 whose estimated time is within
+   25% below or 5% above the target, favouring higher scores.
+3. Route each candidate leg by leg. Each leg avoids the roads earlier legs used, by
+   excluding a point every 800 m along them, except within 1.5 km of the leg's own
+   ends. If no route exists, the leg is routed without the exclusions.
+4. Match every route to corridors through the OSM way ids from `trace_attributes` and
+   keep the loops that pass the checks in `docs/api.md`.
+
+The numbers (55%, 15%, 2 km, 30%, 15%, the 0.85 speed factor, the tolerances and the
+spacing) are first guesses and live in `backend/src/spirited/loops/config.py`. Loops
+are ranked by score with a small penalty for missing the target time (a loop 10% off
+loses 2.5 points). Motorways are avoided through `use_highways: 0`, and a loop that still
+uses one is rejected.
+
+**Why.** Valhalla's costing cannot see our scores, so waypoint choice is the only way
+to steer it. The avoid-points step exists because a first version let legs retrace each
+other: on a grid-like test network, 24 of 40 candidates repeated more than 10% of their
+road. The way id alone cannot measure that, since a long OSM way is many edges, so each
+edge is keyed by its way and its two ends.
+
+**Cost.** Loops are only as good as the scores, which cannot see width. The checks reject
+candidates by rule, so a start with few good roads returns fewer loops, or none, and says
+why. Estimated times come from a model, not from a drive. Routing about 20 candidates
+took half a second on a local test network and has not been timed on the real region.
+
+## 2026-10-02: A local map page for looking at loops
+
+**Decision.** `make loops` writes `out/loops/loops.html`, a page that loads Leaflet from
+cdnjs and Esri's World Street Map tiles, with OpenStreetMap's own tiles as a second layer.
+
+**Why.** Nothing so far could be looked at on a map, and scores are hard to judge as
+numbers. The first version used openstreetmap.org's own tiles, which refused to load because a
+page opened from a file sends no Referer. CARTO's raster tiles were tried next and now
+demand an API key. Esri's tiles load without a key from a local file and are fine for one
+person looking at their own results; their terms do not cover an app, so the app's
+provider is still a Stage 4 decision.
+
+## 2026-10-02: Dual carriageways never score; bare tertiary roads are not trusted
+
+**Decision.** Two rules, both from the 16 reference roads.
+- A trunk or primary road tagged `oneway`, or any road tagged `dual_carriageway=yes` or
+  `expressway=yes`, is ineligible, reason `dual_carriageway`. OSM draws a dual
+  carriageway as two one-way ways, so the A3290 (`dual_carriageway=yes`, 70 mph) and the
+  A4 at Reading (`oneway=yes`, 40 mph) both qualify. One-way secondary and tertiary
+  roads are left alone: they are rare and usually a village street.
+- A tertiary way with no paved `surface` tag and no speed limit tag (so the speed is
+  assumed) gets the 0.55 factor, as an unclassified road does, and is not recommended.
+  Sonning Common Road, disliked as single track, has only `highway=tertiary` and a name;
+  the liked Brimpton Road and Goring Lane have `lanes=2`, a surface and a speed.
+
+**Why.** Both disliked kinds scored well above liked roads: the A3290 at 50.6 and
+Sonning at 63.7. The first is two carriageways, which is not the drive Spirited is
+for; the second is a road nobody has surveyed, and the safety rule is to include on
+evidence.
+
+**Cost.** The second rule drops part of the 894 km of tertiary road with no surface tag;
+the build summary shows how much. A tertiary road with a speed tag but no surface tag
+stays in. Tertiary roads can be single track while tagged like any other, so this rule
+catches only the unsurveyed ones, not single-track roads in general.
+
+## 2026-10-02: Unclassified roads are not recommended without evidence
+
+**Decision.** In a corridor's confidence, the surface factor for an unclassified way is
+0.55 unless the way has both a paved `surface` tag and a `width` or `est_width` of at
+least 5 m. That alone puts a corridor made of such ways below the 0.6 cut-off, so it is
+still scored and routable but never recommended for itself. Other classes without a
+surface tag keep the 0.9 factor. (The first version only asked for a surface tag; the
+reference roads showed that five disliked single-track lanes carry one, and LonZac
+asked for unclassified roads to be excluded by default.)
 
 **Why.** The project's safety rule says missing surface data on minor roads is suspect
 and low-confidence segments are excluded from recommendations. The first build applied
@@ -17,8 +107,10 @@ Mill Lane, tagged with nothing but `highway=unclassified` and a name, scored in 
 90s. The Stage 0 filter lets such roads into the routing graph when they have a name;
 this keeps them out of what Spirited recommends.
 
-**Cost.** Good lanes that simply lack a surface tag drop out of recommendations. The
-reference roads will show how many; adding `surface=asphalt` in OSM brings them back.
+**Cost.** Good lanes drop out of recommendations unless OSM records their width: the
+liked Warren Row Road is one. Wrongly dropping a good lane loses a suggestion; wrongly
+recommending a single-track lane is the failure that matters. Adding `surface=asphalt`
+and `width` in OSM brings a lane back.
 
 ## 2026-10-02: Narrow lanes score lower
 
@@ -26,8 +118,9 @@ reference roads will show how many; adding `surface=asphalt` in OSM brings them 
 narrowness is the length-weighted share of road that is narrow. A way counts as
 narrow (1) when it is two-way and tagged `lanes=1` or a `width`/`est_width` under
 5 m, and a whole corridor counts as narrow when it has a `highway=passing_place` node.
-An unclassified way with no lanes or width tag counts as possibly narrow (0.5), so its
-score drops by a quarter. A tag showing two lanes or a width of 5 m or more clears it.
+An unclassified way with no width tag of 5 m or more counts as possibly narrow (0.5),
+so its score drops by a quarter. `lanes=2` does not clear it (see the 2026-10-02
+entry on `lanes=2` below).
 
 **Why.** In the first real build, a road LonZac knows as twisty and semi single-track
 ranked near the top, because the score rewarded its bends and knew nothing about its
@@ -131,7 +224,7 @@ and sends the same car costing profile with every request:
 | `service_penalty` | 300 s | Guards against mistagged service roads |
 | `use_ferry` | 0 | No ferries in a driving loop |
 | `ignore_access` | false | Respect every access restriction |
-| `use_highways` | 0.5 | Neutral for now; Stage 3 will lower it |
+| `use_highways` | 0 | Loops avoid motorways; any loop that still uses one is rejected |
 
 The profile is pinned by a unit test. Routes are checked against the roads the
 filter removed by sending each leg back through `trace_attributes` with
@@ -225,3 +318,71 @@ offline, and a single file is much simpler to host.
 
 **Tooling.** uv, ruff, pyright and pytest for Python. Gradle with a version catalogue
 and Spotless with ktlint for Android. GitHub Actions runs both on every push.
+
+## 2026-10-02: Planned loop times are corrected by what routing shows
+
+**Decision.** The matrix gives each candidate a planned time. After four candidates have
+been routed, the median ratio of routed to planned time scales the plans that remain, and
+those that would miss the tolerance are skipped. The planning window is wider
+(30% below, 15% above) and up to 100 plans are kept.
+
+**Why.** On the real region, 21 of 29 candidates failed on time. Routing each leg around
+the roads the earlier legs used adds detours the matrix cannot see, so loops come out
+longer than planned and a fixed window is aimed in the wrong place. The correction is a
+single median, which is crude: it assumes detours cost about the same proportion for every
+candidate. If that proves false the fix is to route fewer, better-chosen loops, not a
+cleverer correction.
+
+## 2026-10-03: Loop limits eased after the first real runs
+
+**Decision.** Time tolerance 10% to 15%, minimum recommended share 60% to 55%, maximum
+built-up share 25% to 30%. The limit on road we cannot vouch for (15%, no stretch over
+2 km) is unchanged.
+
+**Why.** With the original limits, three start points taken from the reference roads gave
+no loops at all. With a tolerance of 20%, 50% and 35%, Brimpton gave two loops and
+Waltham St Lawrence three. LonZac preferred the loops at 76% and 72% recommended road
+(18% and 26% built up) to the one at 70% (28% built up), so the built-up limit is set
+just above that and not at the 35% tried. The time tolerance stops at 15% because a loop
+that misses by more than that is the wrong answer, not a looser one. Brimpton's loops
+scored about 37 against 45 to 48 elsewhere: the area has little recommended road, and
+easing the limits there trades quality for having any loop. This rests on three start
+points and one person's opinion.
+
+## 2026-10-03: Plan for the detours routing adds
+
+**Decision.** Candidates are planned as if routing adds 25% to the matrix's estimate
+(`detour_prior`), from the first candidate, and the measured median replaces that after
+four have been routed. Candidates whose time would still miss are skipped. The planning
+window on the raw estimate is wide (45% below the target, 15% above) so a wrong prior
+cannot hide the right candidates.
+
+**Why.** Routing added a median of 24% at Watlington and 25% at Kintbury, so the loops
+were being planned about a quarter short and the first four routed candidates were mostly
+wasted. Kintbury then gave three loops (Watlington one). The prior comes from two start
+points and may differ in other country, which is why it is replaced by the measured value.
+
+## 2026-10-03: Skip a plan only if no plausible detour fits
+
+**Decision.** Replaces the skipping rule of the previous entry. A planned candidate is
+skipped only if it misses the time at both ends of the detour range (1.0 to 1.7 times the
+matrix estimate, widened if routing shows more). The 25% prior now only orders candidates.
+
+**Why.** Through the API, Kintbury gave one loop from 22 candidates where the command line
+had given three from 8 before the prior was added. The likely cause: detours differ a lot
+from loop to loop, and the loops that pass are those with small detours, which the median
+prior (and the median after four routed) skipped. This is an inference from the numbers, to
+be confirmed by rerunning Kintbury. Cost: more candidates are routed per request.
+
+## 2026-10-03: Rank candidates two ways and try them in turn
+
+**Decision.** Candidates are ranked once at face value and once allowing 25% for detours,
+and the two lists are interleaved. The planning window above the target goes back to 15%.
+
+**Why.** The previous entry's fix did not bring Kintbury back to three loops: one loop from
+38 candidates, against three from 8 before the detour prior existed. Of the loops lost,
+one (102 minutes) had a raw estimate above the 10% window set in the same patch, and
+ranking by the expected detour pushes loops with almost no detour behind others that then
+fail on time, and the similar-anchors filter drops them. Interleaving keeps the old order
+as half of the candidates. This is again inference, not a measurement; the Kintbury rerun
+decides it.

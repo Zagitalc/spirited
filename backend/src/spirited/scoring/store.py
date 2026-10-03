@@ -27,6 +27,25 @@ class ScoreStore:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
+    def anchors(
+        self, box: tuple[float, float, float, float], min_length_m: float
+    ) -> list[sqlite3.Row]:
+        """Points on recommendable corridors inside `box` (min lon, min lat, max lon,
+        max lat), best-scored corridor first. `min_length_m` is the shortest corridor wanted."""
+        min_lon, min_lat, max_lon, max_lat = box
+        try:
+            return self._db.execute(
+                "SELECT a.corridor_id, a.lon, a.lat, c.label, c.highway, c.length_m, c.score "
+                "FROM anchors a JOIN corridors c ON c.id = a.corridor_id "
+                "WHERE c.length_m >= ? AND a.lat BETWEEN ? AND ? AND a.lon BETWEEN ? AND ? "
+                "ORDER BY c.score DESC",
+                (min_length_m, min_lat, max_lat, min_lon, max_lon),
+            ).fetchall()
+        except sqlite3.OperationalError as error:
+            raise RuntimeError(
+                "scores.sqlite has no anchor points: run `make scores` again"
+            ) from error
+
     def corridors_for_ways(self, way_ids: Iterable[int]) -> dict[int, sqlite3.Row]:
         """The corridor row for each way id that has one, keyed by way id."""
         ids = sorted(set(way_ids))

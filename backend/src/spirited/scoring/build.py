@@ -35,6 +35,7 @@ from spirited.scoring.geometry import (
     Coords,
     length_m,
     mean_node_spacing_m,
+    points_along_lonlat,
     resample,
     to_lonlat,
     to_xy,
@@ -57,11 +58,16 @@ JUNCTION_CONFIDENCE = 0.9
 SETTLEMENT_CONFIDENCE = {"landuse": 0.9, "place_only": 0.6}
 ELEVATION_CONFIDENCE = 0.6
 # A road kept by the filter only because its class is presumed paved.
+# Stage 3 routes loops through points on corridors that are long enough to be worth it.
+ANCHOR_MIN_CORRIDOR_M = 2000.0
+ANCHOR_SPACING_M = 4000.0
 PRESUMED_SURFACE_FACTOR = 0.9
-# An unclassified road with no surface tag is suspect (the project's safety rule).
-# This factor alone takes it below MIN_CONFIDENCE, so such a road can be routed over
-# but never recommended for itself.
-UNTAGGED_MINOR_SURFACE_FACTOR = 0.55
+# An unclassified road is excluded by default and included on evidence (the project's
+# safety rule): it needs a paved surface tag and a width of at least 5 m. A tertiary
+# road needs a surface tag or a speed limit tag. This factor
+# alone takes it below MIN_CONFIDENCE, so such a road can be routed over but never
+# recommended for itself.
+UNEVIDENCED_MINOR_FACTOR = 0.55
 
 HeightSource = Callable[[Sequence[Coords]], list[NDArray[np.float64] | None]]
 """Takes (lon, lat) sample points per corridor and returns heights in metres per corridor."""
@@ -96,6 +102,7 @@ _WAY_TAGS = (
     "lit",
     "junction",
     "dual_carriageway",
+    "expressway",
     "surface",
     "lanes",
     "width",
@@ -190,6 +197,8 @@ def way_facts(way: RawWay, region: Region) -> WayFacts:
     place = settlement(xy, region)
     speed = speed_limit(way.tags, in_settlement=place.share > 0.5)
     ineligible = c.ineligible_reason(way.tags["highway"], speed.mph)
+    if ineligible is None and c.is_dual_carriageway(way.tags):
+        ineligible = Ineligible.DUAL_CARRIAGEWAY
     if way.tags.get("junction") in ("roundabout", "circular"):
         ineligible = Ineligible.ROUNDABOUT
     return WayFacts(way, xy, length_m(xy), place, speed, ineligible)
@@ -339,7 +348,9 @@ def _score(
         "settlement_share": place.share,
         "climb_m_per_km": climb,
     }
-    item.surface_factor = _weighted((_surface_factor(f.way.tags), f.length_m) for f in members)
+    item.surface_factor = _weighted(
+        (_surface_factor(f.way.tags, f.speed.source), f.length_m) for f in members
+    )
     if any(node in region.passing_places for node in item.corridor.node_ids):
         narrow = 1.0
     else:
@@ -350,12 +361,15 @@ def _score(
     item.confidence = confidence * item.surface_factor
 
 
-def _surface_factor(tags: dict[str, str]) -> float:
-    if tags.get("surface") in PAVED_SURFACES:
-        return 1.0
-    if tags.get("highway") == "unclassified":
-        return UNTAGGED_MINOR_SURFACE_FACTOR
-    return PRESUMED_SURFACE_FACTOR
+def _surface_factor(tags: dict[str, str], speed_source: SpeedSource) -> float:
+    paved = tags.get("surface") in PAVED_SURFACES
+    highway = tags.get("highway")
+    if highway == "unclassified" and not (paved and c.narrowness(tags) == 0):
+        return UNEVIDENCED_MINOR_FACTOR
+    # A tertiary road with neither a surface nor a speed tag has not been surveyed.
+    if highway == "tertiary" and not paved and speed_source is SpeedSource.ASSUMED:
+        return UNEVIDENCED_MINOR_FACTOR
+    return 1.0 if paved else PRESUMED_SURFACE_FACTOR
 
 
 # --- heights from Valhalla ----------------------------------------------------
@@ -407,12 +421,28 @@ CREATE TABLE corridors (
     surface_factor REAL,
     {parts}
 );
+CREATE TABLE anchors (
+    corridor_id INTEGER NOT NULL REFERENCES corridors(id),
+    lon REAL NOT NULL,
+    lat REAL NOT NULL
+);
+CREATE INDEX anchors_position ON anchors (lat, lon);
 CREATE TABLE corridor_ways (
     way_id INTEGER PRIMARY KEY,
     corridor_id INTEGER NOT NULL REFERENCES corridors(id)
 );
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
+
+
+def _anchor_points(s: CorridorScore) -> list[tuple[float, float]]:
+    """Places on a corridor that a loop can be routed through: one every ANCHOR_SPACING_M
+    along any corridor that can be recommended and is long enough to be worth driving to."""
+    if s.ineligible is not None or s.confidence < c.MIN_CONFIDENCE:
+        return []
+    if s.length_m < ANCHOR_MIN_CORRIDOR_M:
+        return []
+    return points_along_lonlat(s.corridor.lonlat, max(1, round(s.length_m / ANCHOR_SPACING_M)))
 
 
 def write_scores(
@@ -453,6 +483,10 @@ def write_scores(
         marks = ", ".join("?" for _ in columns)
         db.executemany(f"INSERT INTO corridors ({', '.join(columns)}) VALUES ({marks})", rows)
         db.executemany("INSERT INTO corridor_ways VALUES (?, ?)", way_to_corridor.items())
+        db.executemany(
+            "INSERT INTO anchors VALUES (?, ?, ?)",
+            [(s.corridor.id, lon, lat) for s in scores for lon, lat in _anchor_points(s)],
+        )
         db.executemany(
             "INSERT INTO meta VALUES (?, ?)",
             [(key, json.dumps(value)) for key, value in meta.items()],

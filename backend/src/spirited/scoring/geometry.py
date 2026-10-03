@@ -47,6 +47,17 @@ def length_m(xy: Coords) -> float:
     return float(segment_lengths(xy).sum())
 
 
+def points_along_lonlat(lonlat: Coords, count: int) -> list[tuple[float, float]]:
+    """`count` points spaced evenly along a line, each in the middle of its share of the
+    line (one point is the midpoint), as (lon, lat)."""
+    xy = to_xy(lonlat)
+    along = np.concatenate([[0.0], np.cumsum(segment_lengths(xy))])
+    at = (np.arange(count) + 0.5) / count * along[-1]
+    x = np.interp(at, along, xy[:, 0])
+    y = np.interp(at, along, xy[:, 1])
+    return [(float(lon), float(lat)) for lon, lat in to_lonlat(np.column_stack([x, y]))]
+
+
 def resample(xy: Coords, step_m: float) -> Coords:
     """Points every `step_m` metres along the line, always including both ends."""
     lengths = segment_lengths(xy)
