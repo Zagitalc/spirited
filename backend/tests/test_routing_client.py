@@ -99,3 +99,46 @@ def test_build_asks_for_heights_in_batches(client: ValhallaClient) -> None:
     # Batches of 3: [0, 10, 20] then [0, 10, 20], split back into 4 and 2.
     assert first.tolist() == [0.0, 10.0, 20.0, 0.0]
     assert second.tolist() == [10.0, 20.0]
+
+
+def test_isochrone_returns_the_outline_as_lat_lon(monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert request.url.path == "/isochrone"
+        assert body["contours"] == [{"time": 25}]
+        assert body["polygons"] is True
+        ring = [[-1.3, 51.4], [-1.1, 51.4], [-1.1, 51.6], [-1.3, 51.4]]
+        small = [[-1.2, 51.5], [-1.19, 51.5], [-1.19, 51.51], [-1.2, 51.5]]
+        features = [
+            {"geometry": {"type": "Polygon", "coordinates": [small]}},
+            {"geometry": {"type": "Polygon", "coordinates": [ring]}},
+            {"geometry": {"type": "Point", "coordinates": [-1.2, 51.5]}},
+        ]
+        return httpx.Response(200, json={"type": "FeatureCollection", "features": features})
+
+    http = httpx.Client(base_url="http://valhalla", transport=httpx.MockTransport(handler))
+    outline = ValhallaClient(http=http).isochrone((51.5, -1.2), 25)
+    assert outline[0] == (51.4, -1.3)  # lat first, and the larger polygon
+    assert len(outline) == 4
+
+
+def test_isochrone_without_a_polygon_is_an_error() -> None:
+    http = httpx.Client(
+        base_url="http://valhalla",
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"features": []})),
+    )
+    with pytest.raises(ValhallaError):
+        ValhallaClient(http=http).isochrone((51.5, -1.2), 25)
+
+
+def test_matrix_gives_seconds_between_every_pair() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        assert request.url.path == "/sources_to_targets"
+        assert body["sources"] == body["targets"]
+        row = [{"time": 0.0}, {"time": 120.0}]
+        return httpx.Response(200, json={"sources_to_targets": [row, [{"time": None}, row[0]]]})
+
+    http = httpx.Client(base_url="http://valhalla", transport=httpx.MockTransport(handler))
+    times = ValhallaClient(http=http).matrix([(51.5, -1.2), (51.6, -1.1)])
+    assert times == [[0.0, 120.0], [None, 0.0]]

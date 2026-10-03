@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import Any
 
 import httpx
@@ -37,6 +39,22 @@ class Edge:
     way_id: int
     names: tuple[str, ...]
     length_km: float
+    # Where the edge begins and ends. A long OSM way is many edges, so the way id alone
+    # cannot tell a road driven twice from a road driven on for another stretch.
+    ends: tuple[LatLon, LatLon] | None = None
+
+    @property
+    def key(self) -> tuple[object, ...]:
+        """The same for an edge driven either way, so a road used twice has one key."""
+        if self.ends is None:
+            return (self.way_id,)
+        a, b = (tuple(round(v, 5) for v in end) for end in self.ends)
+        return (self.way_id, *sorted([a, b]))
+
+
+def _ring_area(ring: list[list[float]]) -> float:
+    """Shoelace area of a (lon, lat) ring, enough to tell which of two is bigger."""
+    return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in pairwise(ring)) / 2)
 
 
 class ValhallaClient:
@@ -67,8 +85,9 @@ class ValhallaClient:
         except httpx.HTTPError:
             return False
 
-    def route(self, points: list[LatLon]) -> Route:
-        """A car route through the points, in order."""
+    def route(self, points: list[LatLon], avoid: Sequence[LatLon] = ()) -> Route:
+        """A car route through the points, in order. Each `avoid` point excludes the road
+        nearest to it, in both directions."""
         if len(points) < 2:
             raise ValueError("a route needs at least two points")
         body = {
@@ -78,6 +97,8 @@ class ValhallaClient:
             "units": "kilometers",
             "directions_type": "none",
         }
+        if avoid:
+            body["exclude_locations"] = [{"lat": lat, "lon": lon} for lat, lon in avoid]
         trip = self._post("/route", body)["trip"]
         shapes = tuple(leg["shape"] for leg in trip["legs"])
         decoded: list[LatLon] = []
@@ -93,6 +114,42 @@ class ValhallaClient:
             points=tuple(decoded),
         )
 
+    def isochrone(self, start: LatLon, minutes: float) -> list[LatLon]:
+        """The outline (lat, lon) of everywhere reachable from `start` in `minutes`."""
+        body = {
+            "locations": [{"lat": start[0], "lon": start[1]}],
+            "costing": COSTING,
+            "costing_options": costing_options(),
+            "contours": [{"time": minutes}],
+            "polygons": True,
+            "denoise": 0.5,
+        }
+        data = self._post("/isochrone", body)
+        rings = [
+            feature["geometry"]["coordinates"][0]
+            for feature in data.get("features", [])
+            if feature["geometry"]["type"] == "Polygon"
+        ]
+        if not rings:
+            raise ValhallaError(f"no isochrone around {start}: is it on a road?")
+        ring = max(rings, key=_ring_area)
+        return [(float(lat), float(lon)) for lon, lat in ring]
+
+    def matrix(self, points: list[LatLon]) -> list[list[float | None]]:
+        """Drive time in seconds from each point to each other point (None: no route)."""
+        locations = [{"lat": lat, "lon": lon} for lat, lon in points]
+        body = {
+            "sources": locations,
+            "targets": locations,
+            "costing": COSTING,
+            "costing_options": costing_options(),
+        }
+        data = self._post("/sources_to_targets", body)
+        return [
+            [None if cell.get("time") is None else float(cell["time"]) for cell in row]
+            for row in data["sources_to_targets"]
+        ]
+
     def edges(self, route: Route) -> list[Edge]:
         """Every graph edge the route uses, with its OSM way id, in order."""
         edges: list[Edge] = []
@@ -103,16 +160,32 @@ class ValhallaClient:
                 "costing_options": costing_options(),
                 "shape_match": "edge_walk",
                 "filters": {
-                    "attributes": ["edge.way_id", "edge.names", "edge.length"],
+                    "attributes": [
+                        "shape",
+                        "edge.way_id",
+                        "edge.names",
+                        "edge.length",
+                        "edge.begin_shape_index",
+                        "edge.end_shape_index",
+                    ],
                     "action": "include",
                 },
             }
-            for edge in self._post("/trace_attributes", body).get("edges", []):
+            data = self._post("/trace_attributes", body)
+            shape = polyline.decode(data["shape"]) if data.get("shape") else []
+            for edge in data.get("edges", []):
+                begin, end = edge.get("begin_shape_index"), edge.get("end_shape_index")
+                ends = (
+                    (shape[begin], shape[end])
+                    if begin is not None and end is not None and end < len(shape)
+                    else None
+                )
                 edges.append(
                     Edge(
                         way_id=int(edge["way_id"]),
                         names=tuple(edge.get("names", ())),
                         length_km=float(edge.get("length", 0.0)),
+                        ends=ends,
                     )
                 )
         return edges

@@ -20,6 +20,53 @@ loses a quarter of its score. A `width` tag of 5 m or more removes that. On the
 ten reference roads this one change puts all five liked roads above all five
 disliked ones, but by 1.8 points, so it needs checking on roads not used to find it.
 
+## 2026-10-02: How loops are generated (Stage 3)
+
+**Decision.** A loop is built from waypoints chosen on well-scored roads, not found by
+searching the road network.
+1. Ask Valhalla for the area reachable in 40% of the target time (an isochrone) and take
+   points from the score database that lie inside it: one every 4 km along each
+   recommendable corridor of at least 2 km, best-scored corridors first, spread
+   around the start by bearing, at least 3 km apart, at most 16 of them and 3 per
+   corridor.
+2. Use one time matrix call to estimate every loop of two (and, from a 55-minute
+   target, three) of those points, and keep up to 60 whose estimated time is within
+   25% below or 5% above the target, favouring higher scores.
+3. Route each candidate leg by leg. Each leg avoids the roads earlier legs used, by
+   excluding a point every 800 m along them, except within 1.5 km of the leg's own
+   ends. If no route exists, the leg is routed without the exclusions.
+4. Match every route to corridors through the OSM way ids from `trace_attributes` and
+   keep the loops that pass the checks in `docs/api.md`.
+
+The numbers (60%, 15%, 2 km, 25%, 10%, the 0.85 speed factor, the tolerances and the
+spacing) are first guesses and live in `backend/src/spirited/loops/config.py`. Loops
+are ranked by score with a small penalty for missing the target time (a loop 10% off
+loses 2.5 points). Motorways are avoided through `use_highways: 0`, and a loop that still
+uses one is rejected.
+
+**Why.** Valhalla's costing cannot see our scores, so waypoint choice is the only way
+to steer it. The avoid-points step exists because a first version let legs retrace each
+other: on a grid-like test network, 24 of 40 candidates repeated more than 10% of their
+road. The way id alone cannot measure that, since a long OSM way is many edges, so each
+edge is keyed by its way and its two ends.
+
+**Cost.** Loops are only as good as the scores, which cannot see width. The checks reject
+candidates by rule, so a start with few good roads returns fewer loops, or none, and says
+why. Estimated times come from a model, not from a drive. Routing about 20 candidates
+took half a second on a local test network and has not been timed on the real region.
+
+## 2026-10-02: A local map page for looking at loops
+
+**Decision.** `make loops` writes `out/loops/loops.html`, a page that loads Leaflet from
+cdnjs and Esri's World Street Map tiles, with OpenStreetMap's own tiles as a second layer.
+
+**Why.** Nothing so far could be looked at on a map, and scores are hard to judge as
+numbers. The first version used openstreetmap.org's own tiles, which refused to load because a
+page opened from a file sends no Referer. CARTO's raster tiles were tried next and now
+demand an API key. Esri's tiles load without a key from a local file and are fine for one
+person looking at their own results; their terms do not cover an app, so the app's
+provider is still a Stage 4 decision.
+
 ## 2026-10-02: Dual carriageways never score; bare tertiary roads are not trusted
 
 **Decision.** Two rules, both from the 16 reference roads.
@@ -177,7 +224,7 @@ and sends the same car costing profile with every request:
 | `service_penalty` | 300 s | Guards against mistagged service roads |
 | `use_ferry` | 0 | No ferries in a driving loop |
 | `ignore_access` | false | Respect every access restriction |
-| `use_highways` | 0.5 | Neutral for now; Stage 3 will lower it |
+| `use_highways` | 0 | Loops avoid motorways; any loop that still uses one is rejected |
 
 The profile is pinned by a unit test. Routes are checked against the roads the
 filter removed by sending each leg back through `trace_attributes` with
@@ -271,3 +318,17 @@ offline, and a single file is much simpler to host.
 
 **Tooling.** uv, ruff, pyright and pytest for Python. Gradle with a version catalogue
 and Spotless with ktlint for Android. GitHub Actions runs both on every push.
+
+## 2026-10-02: Planned loop times are corrected by what routing shows
+
+**Decision.** The matrix gives each candidate a planned time. After four candidates have
+been routed, the median ratio of routed to planned time scales the plans that remain, and
+those that would miss the tolerance are skipped. The planning window is wider
+(30% below, 15% above) and up to 100 plans are kept.
+
+**Why.** On the real region, 21 of 29 candidates failed on time. Routing each leg around
+the roads the earlier legs used adds detours the matrix cannot see, so loops come out
+longer than planned and a fixed window is aimed in the wrong place. The correction is a
+single median, which is crude: it assumes detours cost about the same proportion for every
+candidate. If that proves false the fix is to route fewer, better-chosen loops, not a
+cleverer correction.

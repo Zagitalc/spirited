@@ -43,3 +43,6 @@ android/.kotlin/
 
 # Route exports from manual checks
 *.gpx
+
+# Loop output from `make loops`
+out/

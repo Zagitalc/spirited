@@ -1,7 +1,7 @@
 # Thin wrappers. Each target is one command you can also run by hand,
 # so nothing here is needed on a machine without make.
 
-.PHONY: backend-install backend-test backend-lint backend-run extract routing-data routing routing-rebuild routing-test scores evaluate android
+.PHONY: backend-install backend-test backend-lint backend-run extract routing-data routing routing-rebuild routing-test scores evaluate loops android
 
 backend-install:
 	cd backend && uv sync
@@ -41,6 +41,12 @@ scores:
 
 evaluate:
 	cd backend && uv run python -m spirited.scoring evaluate
+
+# Generate loops from START ("lat,lon") and write out/loops/loops.html plus GPX files.
+# Example: make loops START=51.4545,-0.9781 MINUTES=90
+MINUTES ?= 90
+loops:
+	cd backend && uv run python -m spirited.loops $(START) --minutes $(MINUTES) --out ../out/loops
 
 android:
 	cd android && ./gradlew spotlessCheck assembleDebug

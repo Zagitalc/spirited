@@ -218,3 +218,20 @@ def test_a_tertiary_road_with_no_surface_and_no_speed_tag_is_not_trusted() -> No
     assert build_module._surface_factor(bare, SpeedSource.TAGGED) == pytest.approx(0.9)
     paved = {**bare, "surface": "asphalt"}
     assert build_module._surface_factor(paved, SpeedSource.ASSUMED) == pytest.approx(1.0)
+
+
+def test_anchor_points_are_written_only_for_roads_that_can_be_recommended(
+    scores: sqlite3.Connection,
+) -> None:
+    rows = scores.execute(
+        "SELECT a.corridor_id, c.recommendable, c.ineligible, c.length_m, a.lon, a.lat "
+        "FROM anchors a JOIN corridors c ON c.id = a.corridor_id"
+    ).fetchall()
+    assert rows
+    assert all(r["ineligible"] is None and r["length_m"] >= 2000 for r in rows)
+    b_road = corridor(scores, 100)
+    points = [r for r in rows if r["corridor_id"] == b_road["id"]]
+    # About one point every 4 km, and all of them inside the clip box.
+    assert len(points) == max(1, round(b_road["length_m"] / 4000))
+    assert all(-2.2 <= r["lon"] <= -0.3 and 51.05 <= r["lat"] <= 51.9 for r in points)
+    assert not any(r["corridor_id"] == corridor(scores, 200)["id"] for r in rows)

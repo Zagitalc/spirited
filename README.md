@@ -13,16 +13,17 @@ speed limit, how often you meet junctions and villages, and elevation change.
 
 ## Status
 
-Stage 2 of 5. The OSM extract pipeline, the road safety filter, car routing with
-Valhalla and a first version of road scoring exist. The scoring weights have not yet
-been checked against real roads. There is no loop generation or usable app yet.
+Stage 3 of 5. The OSM extract pipeline, the road safety filter, car routing with
+Valhalla, road scoring and a first version of loop generation exist. The scoring
+weights and the loop limits are first guesses that have been checked against sixteen
+roads and no real loops yet. There is no usable app yet.
 
 | Stage | What | State |
 | --- | --- | --- |
 | 0 | Foundations: structure, tooling, OSM extract | Done |
 | 1 | Routing with Valhalla | Done |
-| 2 | Road scoring | In progress |
-| 3 | Loop generation and HTTP API | Not started |
+| 2 | Road scoring | Done |
+| 3 | Loop generation and HTTP API | In progress |
 | 4 | Android app | Not started |
 | 5 | Hosting and release | Not started |
 
@@ -126,8 +127,23 @@ Add `--detail` (`cd backend && uv run python -m spirited.scoring evaluate --deta
 also see, for each road, the corridors it uses with links to them on OpenStreetMap, its
 bends measured at several radii, and its climb.
 
-`make backend-test`, `make extract`, `make routing`, `make scores` and `make android` are
-shortcuts for the same commands.
+### Loops
+
+With Valhalla running and `make scores` done, from the repository root:
+
+```sh
+make loops START=51.4046,-1.4430 MINUTES=90
+```
+
+This writes up to three loops to `out/loops/`: one GPX file each, and `loops.html`,
+which draws them on a map. Open that page in a browser. Roads are coloured by score,
+orange where a stretch is on roads Spirited cannot vouch for, and grey where it is built
+up. The page loads Leaflet and Esri's map tiles from the internet, for looking at
+your own results only. The same loops come from `POST /loops` once the API is running
+(`make backend-run`); see `docs/api.md`.
+
+`make backend-test`, `make extract`, `make routing`, `make scores`, `make loops` and
+`make android` are shortcuts for the same commands.
 
 ## Which roads Spirited will use
 
@@ -186,7 +202,14 @@ reference roads with known verdicts (see `docs/decisions.md`).
 - Heights come from 30 m terrain data, which cannot see cuttings, embankments or
   bridges. They are smoothed heavily, so short sharp climbs are underrated.
 - The scoring has not yet been checked against enough real roads to trust its
-  weights.
+  weights. It cannot see how wide a road is: a single-track lane with a surface and a
+  speed tag looks the same as a two-lane road, and unclassified lanes are left out
+  altogether, good ones included.
+- Loops are built around well-scored roads, and the limits on how much of a loop may
+  be on other roads (see `docs/decisions.md`) are guesses. Times assume real speeds of
+  85% of Valhalla's free-flow figures, which has not been checked against a drive.
+- A loop near the edge of the covered area, or from a start with only one way out, may
+  retrace part of its road or be cut short.
 - Nothing has been tested on a phone yet.
 
 ## Data and licences

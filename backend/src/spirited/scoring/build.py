@@ -35,6 +35,7 @@ from spirited.scoring.geometry import (
     Coords,
     length_m,
     mean_node_spacing_m,
+    points_along_lonlat,
     resample,
     to_lonlat,
     to_xy,
@@ -57,6 +58,9 @@ JUNCTION_CONFIDENCE = 0.9
 SETTLEMENT_CONFIDENCE = {"landuse": 0.9, "place_only": 0.6}
 ELEVATION_CONFIDENCE = 0.6
 # A road kept by the filter only because its class is presumed paved.
+# Stage 3 routes loops through points on corridors that are long enough to be worth it.
+ANCHOR_MIN_CORRIDOR_M = 2000.0
+ANCHOR_SPACING_M = 4000.0
 PRESUMED_SURFACE_FACTOR = 0.9
 # An unclassified road is excluded by default and included on evidence (the project's
 # safety rule): it needs a paved surface tag and a width of at least 5 m. A tertiary
@@ -417,12 +421,28 @@ CREATE TABLE corridors (
     surface_factor REAL,
     {parts}
 );
+CREATE TABLE anchors (
+    corridor_id INTEGER NOT NULL REFERENCES corridors(id),
+    lon REAL NOT NULL,
+    lat REAL NOT NULL
+);
+CREATE INDEX anchors_position ON anchors (lat, lon);
 CREATE TABLE corridor_ways (
     way_id INTEGER PRIMARY KEY,
     corridor_id INTEGER NOT NULL REFERENCES corridors(id)
 );
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
+
+
+def _anchor_points(s: CorridorScore) -> list[tuple[float, float]]:
+    """Places on a corridor that a loop can be routed through: one every ANCHOR_SPACING_M
+    along any corridor that can be recommended and is long enough to be worth driving to."""
+    if s.ineligible is not None or s.confidence < c.MIN_CONFIDENCE:
+        return []
+    if s.length_m < ANCHOR_MIN_CORRIDOR_M:
+        return []
+    return points_along_lonlat(s.corridor.lonlat, max(1, round(s.length_m / ANCHOR_SPACING_M)))
 
 
 def write_scores(
@@ -463,6 +483,10 @@ def write_scores(
         marks = ", ".join("?" for _ in columns)
         db.executemany(f"INSERT INTO corridors ({', '.join(columns)}) VALUES ({marks})", rows)
         db.executemany("INSERT INTO corridor_ways VALUES (?, ?)", way_to_corridor.items())
+        db.executemany(
+            "INSERT INTO anchors VALUES (?, ?, ?)",
+            [(s.corridor.id, lon, lat) for s in scores for lon, lat in _anchor_points(s)],
+        )
         db.executemany(
             "INSERT INTO meta VALUES (?, ?)",
             [(key, json.dumps(value)) for key, value in meta.items()],
