@@ -135,6 +135,11 @@ With Valhalla running and `make scores` done, from the repository root:
 make loops START=51.4046,-1.4430 MINUTES=90
 ```
 
+Limits can be eased to see what they cost, without editing code:
+`make loops START=... ARGS="--tolerance 0.2 --min-recommended 0.5"` (also
+`--max-not-recommended`, `--max-built-up` and `--speed-factor`). When loops are turned down
+on time, the notes say how far off they were and what else would have failed them.
+
 This writes up to three loops to `out/loops/`: one GPX file each, and `loops.html`,
 which draws them on a map. Open that page in a browser. Roads are coloured by score,
 orange where a stretch is on roads Spirited cannot vouch for, and grey where it is built

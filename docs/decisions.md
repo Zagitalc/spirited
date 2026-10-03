@@ -38,7 +38,7 @@ searching the road network.
 4. Match every route to corridors through the OSM way ids from `trace_attributes` and
    keep the loops that pass the checks in `docs/api.md`.
 
-The numbers (60%, 15%, 2 km, 25%, 10%, the 0.85 speed factor, the tolerances and the
+The numbers (55%, 15%, 2 km, 30%, 15%, the 0.85 speed factor, the tolerances and the
 spacing) are first guesses and live in `backend/src/spirited/loops/config.py`. Loops
 are ranked by score with a small penalty for missing the target time (a loop 10% off
 loses 2.5 points). Motorways are avoided through `use_highways: 0`, and a loop that still
@@ -332,3 +332,57 @@ longer than planned and a fixed window is aimed in the wrong place. The correcti
 single median, which is crude: it assumes detours cost about the same proportion for every
 candidate. If that proves false the fix is to route fewer, better-chosen loops, not a
 cleverer correction.
+
+## 2026-10-03: Loop limits eased after the first real runs
+
+**Decision.** Time tolerance 10% to 15%, minimum recommended share 60% to 55%, maximum
+built-up share 25% to 30%. The limit on road we cannot vouch for (15%, no stretch over
+2 km) is unchanged.
+
+**Why.** With the original limits, three start points taken from the reference roads gave
+no loops at all. With a tolerance of 20%, 50% and 35%, Brimpton gave two loops and
+Waltham St Lawrence three. LonZac preferred the loops at 76% and 72% recommended road
+(18% and 26% built up) to the one at 70% (28% built up), so the built-up limit is set
+just above that and not at the 35% tried. The time tolerance stops at 15% because a loop
+that misses by more than that is the wrong answer, not a looser one. Brimpton's loops
+scored about 37 against 45 to 48 elsewhere: the area has little recommended road, and
+easing the limits there trades quality for having any loop. This rests on three start
+points and one person's opinion.
+
+## 2026-10-03: Plan for the detours routing adds
+
+**Decision.** Candidates are planned as if routing adds 25% to the matrix's estimate
+(`detour_prior`), from the first candidate, and the measured median replaces that after
+four have been routed. Candidates whose time would still miss are skipped. The planning
+window on the raw estimate is wide (45% below the target, 15% above) so a wrong prior
+cannot hide the right candidates.
+
+**Why.** Routing added a median of 24% at Watlington and 25% at Kintbury, so the loops
+were being planned about a quarter short and the first four routed candidates were mostly
+wasted. Kintbury then gave three loops (Watlington one). The prior comes from two start
+points and may differ in other country, which is why it is replaced by the measured value.
+
+## 2026-10-03: Skip a plan only if no plausible detour fits
+
+**Decision.** Replaces the skipping rule of the previous entry. A planned candidate is
+skipped only if it misses the time at both ends of the detour range (1.0 to 1.7 times the
+matrix estimate, widened if routing shows more). The 25% prior now only orders candidates.
+
+**Why.** Through the API, Kintbury gave one loop from 22 candidates where the command line
+had given three from 8 before the prior was added. The likely cause: detours differ a lot
+from loop to loop, and the loops that pass are those with small detours, which the median
+prior (and the median after four routed) skipped. This is an inference from the numbers, to
+be confirmed by rerunning Kintbury. Cost: more candidates are routed per request.
+
+## 2026-10-03: Rank candidates two ways and try them in turn
+
+**Decision.** Candidates are ranked once at face value and once allowing 25% for detours,
+and the two lists are interleaved. The planning window above the target goes back to 15%.
+
+**Why.** The previous entry's fix did not bring Kintbury back to three loops: one loop from
+38 candidates, against three from 8 before the detour prior existed. Of the loops lost,
+one (102 minutes) had a raw estimate above the 10% window set in the same patch, and
+ranking by the expected detour pushes loops with almost no detour behind others that then
+fail on time, and the similar-anchors filter drops them. Interleaving keeps the old order
+as half of the candidates. This is again inference, not a measurement; the Kintbury rerun
+decides it.

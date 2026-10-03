@@ -36,7 +36,7 @@ def test_a_ninety_minute_loop_from_a_village(client: ValhallaClient, store: Scor
     result = generate_loops(KINTBURY, 90, client, store, count=3)
     assert result.loops, result.notes
     for loop in result.loops:
-        assert abs(loop.duration_min - 90) <= 9
-        assert loop.shares[Group.RECOMMENDED] >= 0.6
+        assert abs(loop.duration_min - 90) <= 13.5
+        assert loop.shares[Group.RECOMMENDED] >= 0.55
         assert loop.reuse_share <= 0.1
         assert loop.points[0] == pytest.approx(KINTBURY, abs=0.01)

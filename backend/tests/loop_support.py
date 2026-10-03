@@ -84,7 +84,7 @@ class FakeRouter:
     """Straight-line routing at a fixed speed. Each leg is one edge, on the corridor
     nearest the leg's destination (or the start's own connector when it ends there)."""
 
-    def __init__(self, mids: dict[int, LatLon], slowdown: float = 1.0) -> None:
+    def __init__(self, mids: dict[int, LatLon], slowdown: float = 1.25) -> None:
         self.mids = mids
         self.slowdown = slowdown  # routed time over matrix time, as detours cause in life
         self.routed: list[list[LatLon]] = []

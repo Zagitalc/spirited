@@ -102,7 +102,7 @@ def test_unrecommended_and_built_up_road_count_as_zero_in_the_score(store: Score
         ([(10, 5), (210, 5)], "recommended"),
         ([(10, 8), (210, 2)], "not_recommended"),
         ([(10, 12), (210, 2.5), (20, 5)], "run"),
-        ([(10, 14), (200, 6)], "built_up"),
+        ([(10, 13), (200, 7)], "built_up"),
         ([(10, 10), (11, 1), (10, 2)], "reuse"),
     ],
 )
@@ -171,6 +171,18 @@ def test_candidates_fit_the_time_and_turn_far_enough_between_anchors(mids) -> No
     assert plan_candidates(times, anchors, 400 * 60, CONFIG) == []
 
 
+def test_candidates_are_ranked_with_and_without_the_expected_detour(mids) -> None:
+    router = FakeRouter(mids)
+    anchors = anchors_at([0, 60, 130, 200, 260, 320])
+    times = router.matrix([START, *(a.point for a in anchors)])
+    plans = plan_candidates(times, anchors, 42 * 60, CONFIG, scale=1.25)
+    first = [p.estimate_s / 60 for p in plans[:4]]
+    # Several loops of 33.7 minutes fit once 25% is added and would crowd out the rest if
+    # that were the only ranking; the loops that already take 42 minutes come early too.
+    assert any(m < 36 for m in first)
+    assert any(m >= 42 for m in first)
+
+
 def test_the_same_anchors_in_both_directions_make_one_candidate(mids) -> None:
     router = FakeRouter(mids)
     anchors = anchors_at([0, 120])
@@ -200,7 +212,7 @@ def test_generate_loops_returns_loops_that_pass_every_check(store: ScoreStore, m
     scores = [loop.score for loop in result.loops]
     assert scores == sorted(scores, reverse=True)
     for loop in result.loops:
-        assert abs(loop.duration_min - 45) <= 4.5
+        assert abs(loop.duration_min - 45) <= 6.75
         assert loop.shares[Group.RECOMMENDED] >= 0.6
         assert loop.waypoints
         assert loop.points[0] == loop.points[-1] == START
@@ -210,7 +222,9 @@ def test_the_best_loop_goes_through_the_best_roads(tmp_path: Path) -> None:
     scores = {n: 90.0 if n in (1, 4) else 30.0 for n in range(1, 9)}
     mids = make_store(tmp_path / "s.sqlite", scores=scores)
     with ScoreStore(tmp_path / "s.sqlite") as store:
-        result = generate_loops(START, 50, FakeRouter(mids), store, count=3)
+        # No detours here: a loop that needs none must still be tried, whatever the prior.
+        router = FakeRouter(mids, slowdown=1.0)
+        result = generate_loops(START, 50, router, store, count=3)
     assert set(result.loops[0].waypoints) == {mids[1], mids[4]}
     assert result.loops[0].score > result.loops[-1].score
 
@@ -238,17 +252,30 @@ def test_the_notes_say_why_loops_were_dropped(tmp_path: Path) -> None:
 
 
 def test_candidates_slower_than_planned_are_still_found(tmp_path: Path) -> None:
-    # Every routed loop takes 25% longer than the matrix said. Without correction most
-    # candidates would be wasted on the time check; with it the loops still turn up.
+    # Every routed loop takes 40% longer than the matrix said, more than the prior
+    # expects; the loops that fit must still be found.
     mids = make_store(tmp_path / "s.sqlite")
     with ScoreStore(tmp_path / "s.sqlite") as store:
-        router = FakeRouter(mids, slowdown=1.25)
+        router = FakeRouter(mids, slowdown=1.4)
         result = generate_loops(START, 45, router, store, count=3)
     assert result.loops
     for loop in result.loops:
-        assert abs(loop.duration_min - 45) <= 4.5
-    assert result.rejected["time"] <= 6  # the first few candidates teach the correction
+        assert abs(loop.duration_min - 45) <= 6.75
 
 
 def test_the_anchor_constant_matches_the_store() -> None:
     assert CONFIG.anchor_min_length_m <= ANCHOR_KM * 1000
+
+
+def test_time_misses_are_reported_with_what_else_they_would_have_failed(tmp_path: Path) -> None:
+    mids = make_store(tmp_path / "s.sqlite")
+    with ScoreStore(tmp_path / "s.sqlite") as store:
+        # Routing takes twice as long as planned, so every candidate misses on time.
+        router = FakeRouter(mids, slowdown=2.0)
+        strict = LoopConfig(min_recommended_share=1.01)
+        result = generate_loops(START, 45, router, store, config=strict)
+    assert result.loops == []
+    assert result.rejected["time"] == result.candidates_tried
+    assert result.also_fails["recommended"] == result.candidates_tried
+    assert any("times the time asked" in n and "too little recommended" in n for n in result.notes)
+    assert min(result.time_ratios) > 1.5

@@ -30,7 +30,7 @@ Request:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `start.lat`, `start.lon` | number | Where the drive starts and ends. Must be inside the covered area and near a road. |
-| `duration_min` | integer, 20 to 240 | Target drive time. Each loop takes this long give or take 10%. |
+| `duration_min` | integer, 20 to 240 | Target drive time. Each loop takes this long give or take 15%. |
 | `count` | integer, 1 to 5, default 3 | The most loops to return. |
 
 Response `200`:
@@ -79,9 +79,9 @@ Response `200`:
   be empty with a `200`: that means no loop passed the checks, not that the service
   failed.
 
-A loop passes only if it takes the requested time, has at least 60% of its length on
+A loop passes only if it takes the requested time, has at least 55% of its length on
 recommended roads, at most 15% on roads in `not_recommended` (and no stretch of those
-over 2 km), at most 25% built up, repeats at most 10% of its own roads, stays clear of the
+over 2 km), at most 30% built up, repeats at most 10% of its own roads, stays clear of the
 edge of the data and uses no motorway.
 
 Errors:

@@ -43,10 +43,10 @@ evaluate:
 	cd backend && uv run python -m spirited.scoring evaluate
 
 # Generate loops from START ("lat,lon") and write out/loops/loops.html plus GPX files.
-# Example: make loops START=51.4545,-0.9781 MINUTES=90
+# Example: make loops START=51.4545,-0.9781 MINUTES=90 ARGS="--tolerance 0.2"
 MINUTES ?= 90
 loops:
-	cd backend && uv run python -m spirited.loops $(START) --minutes $(MINUTES) --out ../out/loops
+	cd backend && uv run python -m spirited.loops $(START) --minutes $(MINUTES) --out ../out/loops $(ARGS)
 
 android:
 	cd android && ./gradlew spotlessCheck assembleDebug

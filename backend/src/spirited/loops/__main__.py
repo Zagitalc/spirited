@@ -3,15 +3,18 @@
 uv run python -m spirited.loops 51.4545,-0.9781 --minutes 90 --out out/loops
 
 Writes one GPX file per loop and loops.html, a page that draws them on a map.
+Limits can be eased to see what they cost, e.g. --tolerance 0.2 --min-recommended 0.5.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from spirited.loops import viewer
+from spirited.loops.config import LoopConfig
 from spirited.loops.generate import OutsideRegion, generate_loops
 from spirited.routing.client import ValhallaClient, ValhallaError
 from spirited.routing.gpx import to_gpx
@@ -32,14 +35,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--count", type=int, default=3)
     parser.add_argument("--scores", type=Path, default=SCORES_PATH)
     parser.add_argument("--out", type=Path, default=Path("out/loops"))
+    # Limits that can be eased from the command line to see what they cost.
+    parser.add_argument("--tolerance", type=float, help="allowed miss on time, e.g. 0.2")
+    parser.add_argument("--min-recommended", type=float, dest="min_recommended_share")
+    parser.add_argument("--max-not-recommended", type=float, dest="max_not_recommended_share")
+    parser.add_argument("--max-built-up", type=float, dest="max_built_up_share")
+    parser.add_argument("--speed-factor", type=float, dest="speed_factor")
     args = parser.parse_args(argv)
+    names = (
+        "tolerance",
+        "min_recommended_share",
+        "max_not_recommended_share",
+        "max_built_up_share",
+        "speed_factor",
+    )
+    changes = {n: getattr(args, n) for n in names if getattr(args, n) is not None}
+    config = replace(LoopConfig(), **changes)
 
     with ValhallaClient() as client, ScoreStore(args.scores) as store:
         if not client.is_up():
             print("Valhalla is not running: start it with `make routing`.", file=sys.stderr)
             return 1
         try:
-            result = generate_loops(args.start, args.minutes, client, store, args.count)
+            result = generate_loops(args.start, args.minutes, client, store, args.count, config)
         except OutsideRegion as error:
             print(error, file=sys.stderr)
             return 1

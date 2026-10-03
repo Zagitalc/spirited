@@ -12,9 +12,9 @@ import math
 import sqlite3
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from itertools import pairwise, permutations
+from itertools import pairwise, permutations, zip_longest
 from statistics import median
 from typing import NamedTuple, Protocol
 
@@ -44,7 +44,6 @@ class Router(Protocol):
 
 # Points of score lost per unit of relative time error (a loop 10% off loses 2.5 points).
 TIME_PENALTY = 25.0
-CALIBRATE_AFTER = 4  # routed candidates before the planned times are corrected
 
 
 class OutsideRegion(ValueError):
@@ -106,6 +105,13 @@ class LoopResult:
     notes: list[str] = field(default_factory=list)
     candidates_tried: int = 0
     rejected: Counter[str] = field(default_factory=Counter)
+    # Routed time over requested time, one per routed candidate, and the check each
+    # time-rejected candidate would have failed next. The time check comes first, so
+    # without this a run of "wrong time" hides whether the other limits are too strict.
+    time_ratios: list[float] = field(default_factory=list)
+    also_fails: Counter[str] = field(default_factory=Counter)
+    # Routed time over the matrix's estimate for the same candidate.
+    detour_ratios: list[float] = field(default_factory=list)
 
 
 REJECTION_TEXT = {
@@ -313,20 +319,28 @@ def plan_candidates(
     anchors: Sequence[Anchor],
     target_s: float,
     config: LoopConfig,
+    scale: float = 1.0,
 ) -> list[Plan]:
     """Plans worth routing, best first.
 
     `times[0]` is the start and `times[i + 1]` is anchor i. A candidate's time is
-    estimated from the matrix and must be near the target; among those, loops through
-    better-scored roads come first. Loops through the same set of anchors count once
-    and loops that mostly share anchors with a better one are dropped.
+    estimated from the matrix and must be near the target (the window is wide, since the
+    detours routing adds are not known yet). Among those, loops through better-scored
+    roads come first, less a penalty for missing the target, judged both at face value
+    and once `scale` allows for detours, and the two orders are interleaved. Loops through
+    the same set of anchors count once and loops that mostly share anchors with a better
+    one are dropped.
     """
 
     def leg(a: int, b: int) -> float | None:
         return times[a][b]
 
     sizes = [2, 3] if target_s / 60 >= config.three_waypoints_from_min else [2]
-    scored: dict[frozenset[int], tuple[float, Plan]] = {}
+    # Two rankings, tried in turn: one expects routing to add `scale` to the estimate, the
+    # other takes the estimate at face value. Detours differ a lot from loop to loop and
+    # the loops that pass are often the ones with almost none, so neither ranking alone
+    # is safe to rely on.
+    rankings: list[dict[frozenset[int], tuple[float, Plan]]] = [{}, {}]
     for size in sizes:
         for order in permutations(range(len(anchors)), size):
             stops = [0, *(i + 1 for i in order), 0]
@@ -334,7 +348,6 @@ def plan_candidates(
             if any(t is None for t in legs):
                 continue
             estimate = sum(t for t in legs if t is not None)
-            deviation = abs(estimate / target_s - 1)
             if not -config.planning_below <= estimate / target_s - 1 <= config.planning_above:
                 continue
             bearings = [anchors[i].bearing for i in order]
@@ -344,21 +357,33 @@ def plan_candidates(
             mean_score = sum(
                 anchors[i].score * w for i, w in zip(order, weight, strict=True)
             ) / sum(weight)
-            rank = mean_score - 40 * deviation
             key = frozenset(order)
-            if key not in scored or rank > scored[key][0]:
-                scored[key] = (rank, Plan(order, estimate))
-    ranked = sorted(scored.items(), key=lambda item: -item[1][0])
-    picked: list[Plan] = []
-    sets: list[frozenset[int]] = []
-    for key, (_, plan) in ranked:
-        if any(len(key & other) / len(key | other) > 0.5 for other in sets):
-            continue
-        picked.append(plan)
-        sets.append(key)
-        if len(picked) >= config.max_candidates:
-            break
-    return picked
+            for scored, factor in zip(rankings, (scale, 1.0), strict=True):
+                rank = mean_score - 40 * abs(estimate * factor / target_s - 1)
+                if key not in scored or rank > scored[key][0]:
+                    scored[key] = (rank, Plan(order, estimate))
+
+    lists: list[list[Plan]] = []
+    for scored in rankings:
+        picked: list[Plan] = []
+        sets: list[frozenset[int]] = []
+        for key, (_, plan) in sorted(scored.items(), key=lambda item: -item[1][0]):
+            if any(len(key & other) / len(key | other) > 0.5 for other in sets):
+                continue
+            picked.append(plan)
+            sets.append(key)
+            if len(picked) >= config.max_candidates:
+                break
+        lists.append(picked)
+
+    merged: list[Plan] = []
+    seen: set[tuple[int, ...]] = set()
+    for pair in zip_longest(*lists):
+        for plan in pair:
+            if plan is not None and plan.order not in seen:
+                seen.add(plan.order)
+                merged.append(plan)
+    return merged[: config.max_candidates]
 
 
 # --- putting it together ---------------------------------------------------------
@@ -444,22 +469,26 @@ def generate_loops(
 
     points = [start, *(a.point for a in anchors)]
     times = router.matrix(points)
-    plans = plan_candidates(times, anchors, target_valhalla * 60, config)
+    plans = plan_candidates(times, anchors, target_valhalla * 60, config, config.detour_prior)
     if not plans:
         result.notes.append("No combination of good roads fits that time from that start.")
         return result
 
     # The matrix knows nothing of the detours that avoiding earlier legs forces, so routed
-    # loops tend to run longer than planned. Once a few have been routed, the typical
-    # ratio of actual to planned time tells us which remaining plans are worth the effort.
+    # loops run longer than planned, by very different amounts: the loops that pass tend to
+    # be the ones with the smallest detours. A plan is therefore skipped only when it cannot
+    # fit at any plausible detour, and the range widens if routing shows a wider one.
     target_s = target_valhalla * 60
-    ratios: list[float] = []
+    ratios = result.detour_ratios
     passing: list[Loop] = []
     for plan in plans:
-        if len(ratios) >= CALIBRATE_AFTER:
-            predicted = plan.estimate_s * median(ratios) / target_s - 1
-            if abs(predicted) > config.tolerance:
-                continue
+        low = min([config.detour_low, *ratios])
+        high = max([config.detour_high, *ratios])
+        if (
+            plan.estimate_s * low / target_s - 1 > config.tolerance
+            or plan.estimate_s * high / target_s - 1 < -config.tolerance
+        ):
+            continue
         waypoints = [start, *(anchors[i].point for i in plan.order), start]
         result.candidates_tried += 1
         try:
@@ -469,8 +498,13 @@ def generate_loops(
             continue
         ratios.append(route.duration_s / plan.estimate_s)
         outcome = evaluate_route(route, edges, waypoints[1:-1], store, minutes, config)
+        result.time_ratios.append(route.duration_s / 60 / config.speed_factor / minutes)
         if isinstance(outcome, str):
             result.rejected[outcome] += 1
+            if outcome == "time":
+                ignoring_time = replace(config, tolerance=1e9)
+                other = evaluate_route(route, edges, waypoints[1:-1], store, minutes, ignoring_time)
+                result.also_fails["fits" if isinstance(other, Loop) else other] += 1
         else:
             passing.append(outcome)
         if len(passing) >= count * 3:
@@ -500,4 +534,25 @@ def generate_loops(
             f"Found {len(result.loops)} of {count} loops. Of {result.candidates_tried} "
             f"candidates, {reasons}."
         )
+    if result.rejected["time"] and result.time_ratios:
+        ratios = sorted(result.time_ratios)
+        text = (
+            f"Routed loops took {ratios[0]:.2f} to {ratios[-1]:.2f} times the time asked "
+            f"(median {median(ratios):.2f}). Routing added a median of "
+            f"{median(result.detour_ratios) - 1:.0%} to the matrix's estimate."
+        )
+        late = result.rejected["time"]
+        others = [
+            f"{n} {REJECTION_TEXT.get(key, key)}"
+            for key, n in result.also_fails.most_common()
+            if key != "fits"
+        ]
+        text += f" Of the {late} that missed on time, "
+        if others:
+            text += "also " + ", ".join(others)
+        fine = result.also_fails["fits"]
+        if fine:
+            text += (", and " if others else "") + f"{fine} passed every other check"
+        text += "."
+        result.notes.append(text)
     return result
