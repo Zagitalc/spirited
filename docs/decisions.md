@@ -463,3 +463,20 @@ which is not a valid line. The backend now always returns at least two points.
 
 **Not yet checked.** The screens are untested on a device; the API layer has JVM tests,
 including one that reads a response produced by the backend's own code.
+
+## 2026-10-04: Built-up road near the start and end is not counted against a loop
+
+**Decision.** In the checks on a loop's shares of recommended and built-up road, built-up
+kilometres within 4 km of the start or of the end (measured along the route) are left out of
+both the numerator and the length. The cap on roads we cannot vouch for is unchanged. The
+shares reported to the app still count every kilometre, and `--town-allowance` on the command
+line changes the 4 km.
+
+**Why.** LonZac's phone test from two starts in Caversham gave no loop and one loop. Most
+people start where they live, which is a town, and the road out of it is not the drive. Checking the
+whole loop made the cost of leaving a town fall on every start in one. Leaving the lane cap
+alone keeps the safety rule: the allowance excuses streets, not roads we have no evidence for.
+
+**Risks accepted.** A loop can now be up to 8 km of streets, 4 at each end, on top of the
+30% built-up limit measured on the rest. Unreported: whether that gives good loops from the
+two Caversham starts; that needs a rerun on the real data.

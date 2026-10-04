@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-not-recommended", type=float, dest="max_not_recommended_share")
     parser.add_argument("--max-built-up", type=float, dest="max_built_up_share")
     parser.add_argument("--speed-factor", type=float, dest="speed_factor")
+    parser.add_argument("--town-allowance", type=float, dest="town_allowance_km")
     args = parser.parse_args(argv)
     names = (
         "tolerance",
@@ -48,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         "max_not_recommended_share",
         "max_built_up_share",
         "speed_factor",
+        "town_allowance_km",
     )
     changes = {n: getattr(args, n) for n in names if getattr(args, n) is not None}
     config = replace(LoopConfig(), **changes)

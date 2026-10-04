@@ -102,7 +102,7 @@ def test_unrecommended_and_built_up_road_count_as_zero_in_the_score(store: Score
         ([(10, 5), (210, 5)], "recommended"),
         ([(10, 8), (210, 2)], "not_recommended"),
         ([(10, 12), (210, 2.5), (20, 5)], "run"),
-        ([(10, 13), (200, 7)], "built_up"),
+        ([(10, 6), (200, 7), (10, 7)], "built_up"),
         ([(10, 10), (11, 1), (10, 2)], "reuse"),
     ],
 )
@@ -110,6 +110,19 @@ def test_a_loop_that_fails_a_check_says_which(
     store: ScoreStore, parts: list[tuple[int, float]], reason: str
 ) -> None:
     assert check(store, edges_of(*parts)) == reason
+
+
+def test_built_up_road_near_the_start_and_end_is_not_held_against_a_loop(store: ScoreStore) -> None:
+    # 4 km of village at each end is 40% of a 20 km loop; the way out and back is allowed.
+    loop = check(store, edges_of((200, 4), (10, 12), (240, 4)))
+    assert isinstance(loop, Loop)
+    # What is reported still counts every kilometre.
+    assert loop.shares[Group.BUILT_UP] == pytest.approx(0.4)
+    assert loop.shares[Group.RECOMMENDED] == pytest.approx(0.6)
+    # The same village in the middle of the loop is not excused.
+    assert check(store, edges_of((10, 6), (200, 8), (10, 6))) == "built_up"
+    # And only the first and last few kilometres are: more than that counts.
+    assert check(store, edges_of((200, 10), (10, 10))) == "built_up"
 
 
 def test_a_run_of_unrecommended_road_is_measured_in_one_stretch(store: ScoreStore) -> None:

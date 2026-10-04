@@ -168,10 +168,16 @@ def evaluate_route(
     segments: list[Segment] = []
     along = 0.0
     last_key: tuple[int | None, Group] | None = None
+    free_km = 0.0  # built-up road near the start or the end, not held against the loop
     for edge in edges:
         row = rows.get(edge.way_id)
         group = classify(row)
         km[group] += edge.length_km
+        if group is Group.BUILT_UP:
+            end = along + edge.length_km
+            allowance = config.town_allowance_km
+            free_km += max(0.0, min(end, allowance) - along)  # the way out
+            free_km += max(0.0, end - max(along, total_km - allowance))  # the way back
         if group is Group.RECOMMENDED and row is not None:
             score_km += row["score"] * edge.length_km
         run = run + edge.length_km if group is Group.NOT_RECOMMENDED else 0.0
@@ -200,13 +206,17 @@ def evaluate_route(
 
     shares = {group: value / total_km for group, value in km.items()}
     reuse = reused_km / total_km
-    if shares[Group.RECOMMENDED] < config.min_recommended_share:
+    # The limits are measured on the loop without its way out of town and back.
+    counted_km = max(total_km - free_km, 1e-9)
+    counted = {group: value / counted_km for group, value in km.items()}
+    counted[Group.BUILT_UP] = (km[Group.BUILT_UP] - free_km) / counted_km
+    if counted[Group.RECOMMENDED] < config.min_recommended_share:
         return "recommended"
-    if shares[Group.NOT_RECOMMENDED] > config.max_not_recommended_share:
+    if counted[Group.NOT_RECOMMENDED] > config.max_not_recommended_share:
         return "not_recommended"
     if longest_run > config.max_not_recommended_run_km:
         return "run"
-    if shares[Group.BUILT_UP] > config.max_built_up_share:
+    if counted[Group.BUILT_UP] > config.max_built_up_share:
         return "built_up"
     if reuse > config.max_reuse_share:
         return "reuse"

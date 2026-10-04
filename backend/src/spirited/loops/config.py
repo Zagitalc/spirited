@@ -20,6 +20,10 @@ class LoopConfig:
     max_not_recommended_share: float = 0.15
     max_not_recommended_run_km: float = 2.0
     max_built_up_share: float = 0.30
+    # Built-up road in the first and last this many km of a loop is left out of the share
+    # checks: most people live in a town and must leave it, and that is not the drive.
+    # The shares reported with a loop still count every kilometre.
+    town_allowance_km: float = 4.0
     # Share of a loop that may repeat a way it has already used.
     max_reuse_share: float = 0.10
     # A loop must stay this many degrees inside the edge of the data.
