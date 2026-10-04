@@ -44,6 +44,10 @@ class MapViewModel(
         private set
     var selectedLoop by mutableIntStateOf(0)
         private set
+
+    /** Goes up each time a loop is received or chosen, so the map knows to fit itself to it. */
+    var fitCount by mutableIntStateOf(0)
+        private set
     var backendUrl by mutableStateOf(settings.url)
         private set
     var connectionMessage by mutableStateOf<String?>(null)
@@ -68,7 +72,10 @@ class MapViewModel(
 
     fun chooseLoop(index: Int) {
         val found = (loops as? LoopsState.Loaded)?.response?.loops ?: return
-        if (index in found.indices) selectedLoop = index
+        if (index in found.indices) {
+            selectedLoop = index
+            fitCount++
+        }
     }
 
     fun requestLoops() {
@@ -82,6 +89,7 @@ class MapViewModel(
                     when (val result = api.loops(backendUrl, here.lat, here.lon, minutes)) {
                         is ApiResult.Ok -> {
                             selectedLoop = 0
+                            fitCount++
                             LoopsState.Loaded(result.value)
                         }
                         is ApiResult.Failed -> LoopsState.Error(result.error.message)

@@ -3,6 +3,7 @@ package uk.spirited.app.map
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,9 +12,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +33,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -244,9 +249,11 @@ fun MapScreen(
         }
     }
 
-    // Draw the chosen loop, and fit the map to it when it is a new one.
+    // Draw the chosen loop. The map is fitted to it only when the person has just chosen or
+    // received one; after a rotation the saved camera stays.
     val state = viewModel.loops
     val shown = (state as? LoopsState.Loaded)?.response?.loops?.getOrNull(viewModel.selectedLoop)
+    var fitted by rememberSaveable { mutableStateOf(0) }
     LaunchedEffect(map, styleReady, shown) {
         val style = map?.style ?: return@LaunchedEffect
         if (!styleReady) return@LaunchedEffect
@@ -256,15 +263,16 @@ fun MapScreen(
         } else {
             source.setGeoJson(LoopStyle.features(shown))
             val points = shown.geometry.coordinates.map { LatLng(it[1], it[0]) }
-            if (points.size >= 2) {
+            if (points.size >= 2 && viewModel.fitCount != fitted) {
+                fitted = viewModel.fitCount
                 val bounds = LatLngBounds.Builder().includes(points).build()
                 map?.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80))
             }
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+    val mapBox: @Composable (Modifier) -> Unit = { boxModifier ->
+        Box(modifier = boxModifier) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
             Row(
                 modifier =
@@ -319,7 +327,20 @@ fun MapScreen(
                 Text("Use my location")
             }
         }
-        LoopsPanel(viewModel)
+    }
+
+    // Beside the map when the phone is on its side, under it otherwise, so the map never
+    // shrinks to a strip.
+    if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        Row(modifier = modifier.fillMaxSize()) {
+            mapBox(Modifier.weight(1f).fillMaxHeight())
+            LoopsPanel(viewModel, Modifier.width(360.dp).fillMaxHeight(), maxHeight = Dp.Infinity)
+        }
+    } else {
+        Column(modifier = modifier.fillMaxSize()) {
+            mapBox(Modifier.weight(1f).fillMaxWidth())
+            LoopsPanel(viewModel)
+        }
     }
 
     if (showSettings) {

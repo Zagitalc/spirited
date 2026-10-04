@@ -518,3 +518,17 @@ span between two points of the route; the points before it went to one segment a
 after it to the next, so the span itself was drawn by neither. The GPX and the loop's own line
 were unbroken, which is how this was told apart from a routing fault. The overlap is one span
 of the next segment's colour under that segment's own line, which is not visible.
+
+## 2026-10-04: Landscape puts the panel beside the map
+
+**Decision.** With the phone on its side the controls sit in a 360 dp column to the right of
+the map instead of under it, and the map is fitted to a loop only when a loop is received or
+chosen, not when the screen is recreated by a rotation.
+
+**Why.** The first rotation test on LonZac's phone left a strip of map a few pixels tall,
+zoomed out to the whole country: the panel took the full screen and the map refitted itself
+to the loop while it had almost no height. State survived the rotation; the layout did not
+cope with it.
+
+**Not yet checked.** The new layout has not been seen on a device, and tablets and split screen
+may need their own rules.

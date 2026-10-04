@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import uk.spirited.app.api.Loop
 import uk.spirited.app.map.LoopStyle
@@ -38,6 +39,7 @@ import kotlin.math.roundToInt
 fun LoopsPanel(
     viewModel: MapViewModel,
     modifier: Modifier = Modifier,
+    maxHeight: Dp = 340.dp,
 ) {
     val context = LocalContext.current
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
@@ -45,7 +47,7 @@ fun LoopsPanel(
             modifier =
                 Modifier
                     // Long notes scroll instead of squeezing the map away.
-                    .heightIn(max = 340.dp)
+                    .heightIn(max = maxHeight)
                     .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
                     .padding(16.dp),
