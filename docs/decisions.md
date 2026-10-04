@@ -386,3 +386,46 @@ ranking by the expected detour pushes loops with almost no detour behind others 
 fail on time, and the similar-anchors filter drops them. Interleaving keeps the old order
 as half of the candidates. This is again inference, not a measurement; the Kintbury rerun
 decides it.
+
+## 2026-10-04: Map tiles from OpenFreeMap, and the API on the local network
+
+**Decision.** The app draws its map from OpenFreeMap's public vector tiles through
+MapLibre Native. During Stage 4 the phone reaches the backend on the developer's own
+network (`make backend-run-lan`), with plain HTTP allowed in debug builds only.
+
+**Why.** OpenStreetMap's own raster tiles are not for apps and Esri's terms do not cover
+one. A keyed provider needs an account and a secret the repository must not hold.
+OpenFreeMap's terms (read by LonZac, 2026-10-04) allow use in an app with attribution and
+no key. The local network is the only place the backend runs until Stage 5.
+
+**Risks accepted.** OpenFreeMap has no SLA and can be discontinued, so the style URL sits
+in one constant and self-hosted tiles are the fallback. The app must not prefetch tiles.
+The API has no login, so it must stay off the public internet until Stage 5 adds hosting
+and the questions that come with it.
+
+## 2026-10-04: Each segment carries its own geometry, and the response is pinned
+
+**Decision.** Every segment of a loop in `POST /loops` now includes its `geometry`, and a
+test fixes the exact fields of the response, a loop and a segment.
+
+**Why.** The Android app is the second client. Cutting the line by distance in Kotlin
+would repeat the work `make loops` already does in Python, and the two maps could disagree
+about which stretch is which. The backend decides, both clients draw what it says. Pinning
+the fields means the API and the app can change only together, deliberately. The cost is a
+larger response, since segment lines repeat the loop's own points once.
+
+## 2026-10-04: Plain MapLibre Native in Compose, and the map screen's state
+
+**Decision.** The app uses MapLibre Native Android 13.6.1 directly, wrapped in an
+`AndroidView`, rather than a Compose wrapper library. The start point and camera are kept
+in Compose saved state for now and move to a ViewModel when loops are requested.
+
+**Why.** The Compose wrappers for MapLibre are young and their API is still changing, so a
+version bump could break the app for reasons unrelated to Spirited. The native SDK is stable
+and documented; the cost is a few lines of lifecycle code. The marker is a circle layer in
+the style, not a deprecated `Marker`. MapLibre's attribution button and logo stay on, since
+OpenStreetMap and OpenFreeMap require credit.
+
+**Not yet checked.** The style address `https://tiles.openfreemap.org/styles/liberty` was
+written from memory of OpenFreeMap's guide and could not be fetched from the build sandbox.
+The first phone run settles it.

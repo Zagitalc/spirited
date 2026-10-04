@@ -48,8 +48,10 @@ Response `200`:
       "polyline": "encoded polyline, precision 6 (lat, lon)",
       "gpx": "<?xml version=\"1.0\" ...",
       "segments": [
-        { "from_km": 0.0, "to_km": 6.2, "road": "B4000", "group": "recommended", "score": 68.0 },
-        { "from_km": 6.2, "to_km": 7.0, "road": "Mill Lane", "group": "not_recommended", "score": null }
+        { "from_km": 0.0, "to_km": 6.2, "road": "B4000", "group": "recommended", "score": 68.0,
+          "geometry": { "type": "LineString", "coordinates": [[-1.443, 51.4046], "..."] } },
+        { "from_km": 6.2, "to_km": 7.0, "road": "Mill Lane", "group": "not_recommended", "score": null,
+          "geometry": { "type": "LineString", "coordinates": ["..."] } }
       ],
       "warnings": ["7% of this loop is on roads we cannot vouch for"]
     }
@@ -69,8 +71,11 @@ Response `200`:
   little evidence in OpenStreetMap, or a dual carriageway. `built_up`: villages, residential
   streets, roundabouts and slip roads. `shares` give each group's share of the loop's
   length. `score` is set only for `recommended` segments.
-- `segments` are in driving order. A client can cut `geometry` at `from_km` and
-  `to_km` (measured along the route) to colour it.
+- `segments` are in driving order. Each carries its own `geometry` (GeoJSON, `[lon, lat]`),
+  the part of the loop's line that belongs to it, so a client colours a loop by drawing
+  each segment by its `group` and never works the group out or cuts the line itself.
+  `from_km` and `to_km` are Valhalla's lengths along the route and differ slightly from
+  the length of the line. The set of fields in a response is fixed by a test.
 - `geometry` is GeoJSON, so coordinates are `[lon, lat]`. `polyline` is Google's
   encoding at precision 6 and stores `(lat, lon)`.
 - `warnings` are plain sentences about this loop, safe to show to a person.

@@ -1,7 +1,7 @@
 # Thin wrappers. Each target is one command you can also run by hand,
 # so nothing here is needed on a machine without make.
 
-.PHONY: backend-install backend-test backend-lint backend-run extract routing-data routing routing-rebuild routing-test scores evaluate loops android
+.PHONY: backend-install backend-test backend-lint backend-run backend-run-lan extract routing-data routing routing-rebuild routing-test scores evaluate loops android
 
 backend-install:
 	cd backend && uv sync
@@ -14,6 +14,14 @@ backend-lint:
 
 backend-run:
 	cd backend && uv run uvicorn spirited.api:app --reload
+
+# Serve the API to other devices on this network, such as a phone running the app.
+# The API has no login: use it on a network you trust and never forward the port.
+backend-run-lan:
+	@ip=$$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | cut -d" " -f1); \
+	echo "Phone browser: http://$${ip:-YOUR-COMPUTER-ADDRESS}:8000/health should say ok"; \
+	echo "Android emulator: http://10.0.2.2:8000"
+	cd backend && uv run uvicorn spirited.api:app --reload --host 0.0.0.0
 
 extract:
 	cd backend && uv run python -m spirited.extract all

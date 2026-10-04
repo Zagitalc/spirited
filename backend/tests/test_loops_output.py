@@ -95,6 +95,50 @@ def test_post_loops_returns_loops(client: TestClient) -> None:
     assert isinstance(data["notes"], list)
 
 
+# The fields below are the contract in docs/api.md. A client (the Android app) depends on
+# every one of them, so a change here has to be deliberate: edit this test, the docs and
+# the client together.
+LOOP_FIELDS = {
+    "distance_km",
+    "duration_min",
+    "score",
+    "shares",
+    "reuse_share",
+    "geometry",
+    "polyline",
+    "gpx",
+    "segments",
+    "warnings",
+}
+SEGMENT_FIELDS = {"from_km", "to_km", "road", "group", "score", "geometry"}
+
+
+def test_the_response_has_exactly_the_documented_fields(client: TestClient) -> None:
+    data = client.post("/loops", json=body(count=2)).json()
+    assert set(data) == {"loops", "notes"}
+    assert data["loops"]
+    for loop in data["loops"]:
+        assert set(loop) == LOOP_FIELDS
+        assert set(loop["shares"]) == {"recommended", "not_recommended", "built_up"}
+        assert loop["segments"]
+        for segment in loop["segments"]:
+            assert set(segment) == SEGMENT_FIELDS
+            assert segment["group"] in {"recommended", "not_recommended", "built_up"}
+            assert segment["geometry"]["type"] == "LineString"
+            assert len(segment["geometry"]["coordinates"]) >= 2
+
+
+def test_segment_geometries_follow_the_loop_in_order(client: TestClient) -> None:
+    loop = client.post("/loops", json=body()).json()["loops"][0]
+    whole = loop["geometry"]["coordinates"]
+    pieces = [c for s in loop["segments"] for c in s["geometry"]["coordinates"]]
+    # Pieces may share their joining points, but together they start and end where the
+    # loop does and never leave it.
+    assert pieces[0] == whole[0]
+    assert pieces[-1] == whole[-1]
+    assert {tuple(c) for c in pieces} <= {tuple(c) for c in whole}
+
+
 def test_post_loops_with_no_loop_found_is_still_ok_and_says_why(client: TestClient) -> None:
     response = client.post("/loops", json=body(duration_min=240))
     assert response.status_code == 200

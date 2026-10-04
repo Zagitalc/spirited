@@ -13,18 +13,18 @@ speed limit, how often you meet junctions and villages, and elevation change.
 
 ## Status
 
-Stage 3 of 5. The OSM extract pipeline, the road safety filter, car routing with
+Stage 4 of 5. The OSM extract pipeline, the road safety filter, car routing with
 Valhalla, road scoring and a first version of loop generation exist. The scoring
-weights and the loop limits are first guesses that have been checked against sixteen
-roads and no real loops yet. There is no usable app yet.
+weights and the loop limits are first guesses, checked against sixteen roads and the
+loops from four start points. The app so far is a map; it cannot request loops yet.
 
 | Stage | What | State |
 | --- | --- | --- |
 | 0 | Foundations: structure, tooling, OSM extract | Done |
 | 1 | Routing with Valhalla | Done |
 | 2 | Road scoring | Done |
-| 3 | Loop generation and HTTP API | In progress |
-| 4 | Android app | Not started |
+| 3 | Loop generation and HTTP API | Done |
+| 4 | Android app | In progress |
 | 5 | Hosting and release | Not started |
 
 ## Layout
@@ -89,7 +89,25 @@ cd android
 ./gradlew assembleDebug
 ```
 
-There is nothing to see yet beyond a placeholder screen.
+The app opens on a map of Berkshire (OpenFreeMap tiles through MapLibre Native). Long-press
+the map to put the start marker down. Nothing else is wired up yet: loops, location and GPX
+export come in the next steps of Stage 4. The first build needs internet for Gradle and the
+map tiles.
+
+### Using the API from a phone
+
+`make backend-run-lan` serves the API to other devices on the same network and prints the
+address to try in the phone's browser (`/health` should answer `{"status":"ok"}`). In the
+Android emulator the computer is `http://10.0.2.2:8000`. The API has no login, so use it
+only on a network you trust and never forward its port to the internet. macOS may ask
+whether Python can accept incoming connections: allow it.
+
+The phone and the computer must be on the same network, meaning the same router and the
+same address range (both 192.168.50.x, say). A phone with a static IP address, a guest
+network, or a second router in between will not reach the computer even though the Wi-Fi
+is connected. If you cannot change that, connect the phone by USB and run
+`adb reverse tcp:8000 tcp:8000`; the phone's `http://127.0.0.1:8000` then reaches the
+computer.
 
 ### Routing
 

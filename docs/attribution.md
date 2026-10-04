@@ -18,7 +18,18 @@ Spirited uses OpenStreetMap data in three ways:
   only needs attribution, but if it were ever distributed it would have to be offered
   under the ODbL as well.
 
-The Android app will show "© OpenStreetMap contributors" on the map from Stage 4.
+The Android app will show the map's attribution control from Stage 4, with
+"© OpenMapTiles" and "Data from OpenStreetMap" (see Map tiles below).
+
+## Map tiles
+
+The app draws its map from [OpenFreeMap](https://openfreemap.org/), whose tiles are built
+from OpenStreetMap data in the OpenMapTiles schema. Its terms
+(<https://openfreemap.org/tos/>) need no key or registration, allow use in an app, and
+require attribution, which MapLibre shows automatically: the attribution control must stay
+visible. They ban automated collection without permission, so the app must not prefetch
+or bulk-download tiles. The service has no SLA and may be discontinued, so the style URL
+lives in one constant in the app and self-hosted tiles are the fallback.
 
 ## Elevation
 
@@ -31,4 +42,5 @@ the required credit. The exact wording is to be confirmed before release in Stag
 
 ## Still to check
 
-- The map tile provider, chosen in Stage 4.
+- The exact OpenFreeMap style URL and the MapLibre setup, to be taken from its current
+  guide when the map screen is written.

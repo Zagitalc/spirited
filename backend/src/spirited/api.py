@@ -46,6 +46,7 @@ class SegmentOut(BaseModel):
     road: str
     group: str
     score: float | None
+    geometry: dict[str, Any]
 
 
 class LoopOut(BaseModel):
