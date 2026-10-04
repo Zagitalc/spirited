@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- A computer's address on the home network cannot be listed by name, so debug allows plain HTTP. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

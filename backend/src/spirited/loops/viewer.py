@@ -33,9 +33,11 @@ def segment_paths(loop: Loop) -> list[dict[str, Any]]:
     scale = along[-1] / loop.segments[-1].to_km if loop.segments[-1].to_km else 1.0
     paths = []
     for segment in loop.segments:
-        start = float(np.searchsorted(along, segment.from_km * scale, side="left"))
-        end = float(np.searchsorted(along, segment.to_km * scale, side="right"))
-        piece = loop.points[int(start) : max(int(end), int(start) + 2)]
+        first = int(np.searchsorted(along, segment.from_km * scale, side="left"))
+        end = int(np.searchsorted(along, segment.to_km * scale, side="right"))
+        # A line needs two points, even for a short segment at the very end of the loop.
+        first = min(first, len(loop.points) - 2)
+        piece = loop.points[first : max(end, first + 2)]
         paths.append(
             {
                 "path": [[lat, lon] for lat, lon in piece],

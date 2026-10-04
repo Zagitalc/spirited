@@ -1,17 +1,24 @@
 package uk.spirited.app.map
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,8 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -35,7 +42,6 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
@@ -45,17 +51,15 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import uk.spirited.app.LoopsPanel
+import uk.spirited.app.MapViewModel
+import uk.spirited.app.SettingsSheet
 
 private const val START_SOURCE = "start-source"
 private const val START_LAYER = "start-layer"
 
 /** A point on the map, kept as plain numbers so it survives rotation. */
 data class Position(val lat: Double, val lon: Double)
-
-private val PositionSaver = listSaver<Position?, Double>(
-    save = { p -> if (p == null) emptyList() else listOf(p.lat, p.lon) },
-    restore = { l -> if (l.size == 2) Position(l[0], l[1]) else null },
-)
 
 private val CameraSaver = listSaver<CameraPosition?, Double>(
     save = { c -> if (c == null) emptyList() else listOf(c.target!!.latitude, c.target!!.longitude, c.zoom) },
@@ -65,21 +69,24 @@ private val CameraSaver = listSaver<CameraPosition?, Double>(
 )
 
 /**
- * The map with a single start marker. Long-press puts the start where the finger is.
- * The attribution button and logo that MapLibre draws are left on: the map data licence needs them.
+ * The map, the start marker and the controls under it. Long-press puts the start where the finger is.
+ * The map sits above the panel, not behind it, so the attribution button and logo that MapLibre
+ * draws stay visible: the map data licence needs them.
  */
 @Composable
-fun MapScreen(modifier: Modifier = Modifier) {
+fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember { MapView(context) }
 
-    var start by rememberSaveable(stateSaver = PositionSaver) { mutableStateOf<Position?>(null) }
+    val start = viewModel.start
     var camera by rememberSaveable(stateSaver = CameraSaver) { mutableStateOf<CameraPosition?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var locating by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var permissionBlocked by remember { mutableStateOf(false) }
+    var locating by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     fun locate() {
         locating = true
@@ -88,7 +95,7 @@ fun MapScreen(modifier: Modifier = Modifier) {
             locating = false
             when (result) {
                 is LocationFetcher.Result.Found -> {
-                    start = result.position
+                    viewModel.chooseStart(result.position)
                     message = null
                     map?.animateCamera(
                         CameraUpdateFactory.newLatLngZoom(LatLng(result.position.lat, result.position.lon), 12.0),
@@ -106,9 +113,12 @@ fun MapScreen(modifier: Modifier = Modifier) {
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
         if (granted.values.any { it }) {
+            permissionBlocked = false
             locate()
         } else {
-            message = "Without location permission you can still long-press the map to choose a start."
+            // After a refusal Android may stop showing the prompt, so the way back is the app's settings page.
+            permissionBlocked = true
+            message = "Location permission is off. Allow it in the app's settings, or long-press the map."
         }
     }
 
@@ -145,7 +155,7 @@ fun MapScreen(modifier: Modifier = Modifier) {
                     .build()
             m.addOnCameraIdleListener { camera = m.cameraPosition }
             m.addOnMapLongClickListener { point ->
-                start = Position(point.latitude, point.longitude)
+                viewModel.chooseStart(Position(point.latitude, point.longitude))
                 message = null
                 true
             }
@@ -170,49 +180,68 @@ fun MapScreen(modifier: Modifier = Modifier) {
         val style = map?.style ?: return@LaunchedEffect
         if (!styleReady) return@LaunchedEffect
         val source = style.getSourceAs<GeoJsonSource>(START_SOURCE) ?: return@LaunchedEffect
-        val here = start
-        if (here == null) {
+        if (start == null) {
             source.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
         } else {
-            source.setGeoJson(Feature.fromGeometry(Point.fromLngLat(here.lon, here.lat)))
+            source.setGeoJson(Feature.fromGeometry(Point.fromLngLat(start.lon, start.lat)))
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-        Card(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .safeDrawingPadding()
-                .padding(12.dp),
-        ) {
-            val text = message
-                ?: start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
-                ?: "Long-press the map to choose where to start"
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            )
-        }
-        ExtendedFloatingActionButton(
-            onClick = {
-                val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-                    .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-                if (granted) {
-                    if (!locating) locate()
-                } else {
-                    permissionLauncher.launch(
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                    )
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+            AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Card(modifier = Modifier.weight(1f, fill = false)) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        val text = message
+                            ?: start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
+                            ?: "Long-press the map to choose where to start"
+                        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+                        if (permissionBlocked) {
+                            TextButton(onClick = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                        .setData(Uri.fromParts("package", context.packageName, null)),
+                                )
+                            }) { Text("Open settings") }
+                        }
+                    }
                 }
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .safeDrawingPadding()
-                .padding(16.dp),
-        ) {
-            Text("Use my location")
+                Card { TextButton(onClick = { showSettings = true }) { Text("Backend") } }
+            }
+            ExtendedFloatingActionButton(
+                onClick = {
+                    val permissions = arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                    )
+                    val granted = permissions.any {
+                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                    }
+                    if (granted) {
+                        permissionBlocked = false
+                        if (!locating) locate()
+                    } else {
+                        permissionLauncher.launch(permissions)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+            ) {
+                Text("Use my location")
+            }
         }
+        LoopsPanel(viewModel)
+    }
+
+    if (showSettings) {
+        SettingsSheet(viewModel, onDismiss = { showSettings = false })
     }
 }

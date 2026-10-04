@@ -75,7 +75,8 @@ Response `200`:
   the part of the loop's line that belongs to it, so a client colours a loop by drawing
   each segment by its `group` and never works the group out or cuts the line itself.
   `from_km` and `to_km` are Valhalla's lengths along the route and differ slightly from
-  the length of the line. The set of fields in a response is fixed by a test.
+  the length of the line. Every segment line has at least two points. The set of fields in a
+  response is fixed by a test.
 - `geometry` is GeoJSON, so coordinates are `[lon, lat]`. `polyline` is Google's
   encoding at precision 6 and stores `(lat, lon)`.
 - `warnings` are plain sentences about this loop, safe to show to a person.

@@ -441,3 +441,25 @@ no Google Play services dependency.
 start point, not a trail. Asking at the moment of use explains itself; asking at launch
 does not. The cost is a slower first fix indoors than Google's fused provider would give,
 and a person who refuses permission falls back to long-pressing the map, which still works.
+
+## 2026-10-04: Requests, state and errors in the app
+
+**Decision.** The app talks to the backend with OkHttp and kotlinx.serialization. The chosen
+start, drive time, backend address and the last answer live in a ViewModel, so rotation and
+backgrounding do not lose them. Changing the start or the time cancels a request in flight
+and drops its answer; a second tap on Find loops while waiting does nothing. The backend
+address is a setting (default the emulator's `10.0.2.2`), with a Save and test button, and
+plain HTTP is allowed in debug builds only. Four failures get four different messages: the
+backend refused the start (422, with its reason), it is not ready (503), nothing answered
+(wrong address or another network), and the answer was not readable.
+
+**Why.** A phone cannot say "network error" and leave a person guessing; the three causes
+need three different fixes, and the first one we hit in practice was a phone on another
+network. The response is parsed with unknown fields ignored, so a backend that adds a field
+does not break an installed app, while the backend's own test pins the fields that exist.
+
+**Found on the way.** A segment at the very end of a loop could get a line of one point,
+which is not a valid line. The backend now always returns at least two points.
+
+**Not yet checked.** The screens are untested on a device; the API layer has JVM tests,
+including one that reads a response produced by the backend's own code.

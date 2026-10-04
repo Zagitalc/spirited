@@ -49,6 +49,17 @@ def test_every_segment_gets_part_of_the_line(loop: Loop) -> None:
     assert paths[0]["path"][0] == list(loop.points[0])
 
 
+def test_no_segment_line_has_fewer_than_two_points(tmp_path: Path) -> None:
+    # A segment at the very end of a loop used to get a single point, which is not a line.
+    mids = make_store(tmp_path / "scores.sqlite")
+    with ScoreStore(tmp_path / "scores.sqlite") as store:
+        result = generate_loops(START, 45, FakeRouter(mids), store, count=3)
+    assert len(result.loops) == 3
+    for found in result.loops:
+        assert all(len(p["path"]) >= 2 for p in viewer.segment_paths(found))
+        assert all(len(s["geometry"]["coordinates"]) >= 2 for s in loop_to_dict(found)["segments"])
+
+
 def test_the_map_page_carries_the_loops_and_the_attribution(loop: Loop) -> None:
     page = viewer.render(START, 45, [loop], ["a note </script>"])
     assert "OpenStreetMap" in page

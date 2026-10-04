@@ -92,7 +92,12 @@ cd android
 The app opens on a map of Berkshire (OpenFreeMap tiles through MapLibre Native). Long-press
 the map to put the start marker down, or tap "Use my location" (the phone asks for permission
 then, and the position is read once and never stored). Loops and GPX export come in the next
-steps of Stage 4. The first build needs internet for Gradle and the
+steps of Stage 4.
+
+To ask for loops, run `make backend-run-lan` (with Valhalla up) on the computer, tap
+**Backend** in the app, enter the address it prints (`http://192.168.50.10:8000`, say) and
+use **Save and test**. Then choose a start and a drive time and tap **Find loops**. Debug
+builds allow plain HTTP for this; a release build will not. The first build needs internet for Gradle and the
 map tiles.
 
 ### Using the API from a phone
