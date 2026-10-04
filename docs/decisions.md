@@ -429,3 +429,15 @@ OpenStreetMap and OpenFreeMap require credit.
 **Not yet checked.** The style address `https://tiles.openfreemap.org/styles/liberty` was
 written from memory of OpenFreeMap's guide and could not be fetched from the build sandbox.
 The first phone run settles it.
+
+## 2026-10-04: Location is read once, on request, and never kept
+
+**Decision.** The app asks for location permission only when the person taps "Use my
+location", reads one position through the platform's `LocationManager`, and uses it as the
+start point. Coarse permission is enough. There is no background location, no tracking and
+no Google Play services dependency.
+
+**Why.** The project has no accounts and no live navigation, and a drive planner needs a
+start point, not a trail. Asking at the moment of use explains itself; asking at launch
+does not. The cost is a slower first fix indoors than Google's fused provider would give,
+and a person who refuses permission falls back to long-pressing the map, which still works.

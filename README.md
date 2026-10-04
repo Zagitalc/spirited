@@ -90,8 +90,9 @@ cd android
 ```
 
 The app opens on a map of Berkshire (OpenFreeMap tiles through MapLibre Native). Long-press
-the map to put the start marker down. Nothing else is wired up yet: loops, location and GPX
-export come in the next steps of Stage 4. The first build needs internet for Gradle and the
+the map to put the start marker down, or tap "Use my location" (the phone asks for permission
+then, and the position is read once and never stored). Loops and GPX export come in the next
+steps of Stage 4. The first build needs internet for Gradle and the
 map tiles.
 
 ### Using the API from a phone

@@ -1,10 +1,15 @@
 package uk.spirited.app.map
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,11 +25,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
@@ -70,7 +77,40 @@ fun MapScreen(modifier: Modifier = Modifier) {
     var start by rememberSaveable(stateSaver = PositionSaver) { mutableStateOf<Position?>(null) }
     var camera by rememberSaveable(stateSaver = CameraSaver) { mutableStateOf<CameraPosition?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var locating by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
+
+    fun locate() {
+        locating = true
+        message = "Finding your location..."
+        LocationFetcher.getOnce(context) { result ->
+            locating = false
+            when (result) {
+                is LocationFetcher.Result.Found -> {
+                    start = result.position
+                    message = null
+                    map?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(result.position.lat, result.position.lon), 12.0),
+                    )
+                }
+                LocationFetcher.Result.Unavailable ->
+                    message = "Location is switched off. Turn it on in the phone's settings, or long-press the map."
+                LocationFetcher.Result.NoFix ->
+                    message = "Could not get a location fix. Try again, or long-press the map."
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        if (granted.values.any { it }) {
+            locate()
+        } else {
+            message = "Without location permission you can still long-press the map to choose a start."
+        }
+    }
 
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -106,6 +146,7 @@ fun MapScreen(modifier: Modifier = Modifier) {
             m.addOnCameraIdleListener { camera = m.cameraPosition }
             m.addOnMapLongClickListener { point ->
                 start = Position(point.latitude, point.longitude)
+                message = null
                 true
             }
             m.setStyle(MapConfig.STYLE_URL) { style ->
@@ -145,13 +186,33 @@ fun MapScreen(modifier: Modifier = Modifier) {
                 .safeDrawingPadding()
                 .padding(12.dp),
         ) {
-            val text = start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
+            val text = message
+                ?: start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
                 ?: "Long-press the map to choose where to start"
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
+        }
+        ExtendedFloatingActionButton(
+            onClick = {
+                val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+                if (granted) {
+                    if (!locating) locate()
+                } else {
+                    permissionLauncher.launch(
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                    )
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .safeDrawingPadding()
+                .padding(16.dp),
+        ) {
+            Text("Use my location")
         }
     }
 }
