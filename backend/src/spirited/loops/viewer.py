@@ -37,7 +37,9 @@ def segment_paths(loop: Loop) -> list[dict[str, Any]]:
         end = int(np.searchsorted(along, segment.to_km * scale, side="right"))
         # A line needs two points, even for a short segment at the very end of the loop.
         first = min(first, len(loop.points) - 2)
-        piece = loop.points[first : max(end, first + 2)]
+        # Run one point into the next segment, or the span between the last point of this
+        # segment and the first of the next is drawn by neither and leaves a gap.
+        piece = loop.points[first : min(max(end + 1, first + 2), len(loop.points))]
         paths.append(
             {
                 "path": [[lat, lon] for lat, lon in piece],

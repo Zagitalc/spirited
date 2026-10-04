@@ -91,7 +91,8 @@ cd android
 
 The app opens on a map of Berkshire (OpenFreeMap tiles through MapLibre Native). Long-press
 the map to put the start marker down, or tap "Use my location" (the phone asks for permission
-then, and the position is read once and never stored). GPX export comes in the next step of Stage 4.
+then, and the position is read once and never stored). **Share loop as GPX** sends the chosen loop's track to any app that opens GPX files. Google Maps
+does not import GPX; OsmAnd, Organic Maps, Komoot and Garmin apps do.
 
 To ask for loops, run `make backend-run-lan` (with Valhalla up) on the computer, tap
 **Backend** in the app, enter the address it prints (`http://192.168.50.10:8000`, say) and

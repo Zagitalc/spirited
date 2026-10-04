@@ -493,3 +493,28 @@ is where the numbers and warnings go. Taking the group from the backend keeps th
 the dev map page in agreement, and means a change to the rules is a backend change only.
 The colours are not colour-blind safe on their own: the legend names them, and a later pass
 can add dashes for the orange stretches.
+
+## 2026-10-04: GPX is shared as a file through Android's share sheet
+
+**Decision.** The chosen loop's GPX, exactly as the backend sent it (a track, not a route), is
+written to the app's cache and shared with `ACTION_SEND` through a `FileProvider`. There is no
+storage permission and no export folder; the previous file is deleted before the next is written.
+
+**Why.** The share sheet lets the person choose the navigation app, so Spirited needs no deep
+links into any of them, and a cache file needs no permission. The backend already produces the
+GPX and tests it, so the app does not build one.
+
+**Not yet checked.** Whether the track opens correctly in a real navigation app on the phone,
+and that its timings are believable. A track with no times is a line to follow, not a route
+the app can recalculate if the driver leaves it; that limit belongs in the README until
+a navigation app has been tried.
+
+## 2026-10-04: Segment lines overlap by one point
+
+**Decision.** Each segment's line now includes the first point of the next segment.
+
+**Why.** LonZac saw a gap in a drawn loop. A segment boundary can fall inside a long straight
+span between two points of the route; the points before it went to one segment and the points
+after it to the next, so the span itself was drawn by neither. The GPX and the loop's own line
+were unbroken, which is how this was told apart from a routing fault. The overlap is one span
+of the next segment's colour under that segment's own line, which is not visible.

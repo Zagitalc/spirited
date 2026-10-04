@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -12,7 +14,7 @@ from loop_support import START, FakeRouter, make_store
 
 from spirited import api
 from spirited.loops import viewer
-from spirited.loops.generate import Group, Loop, generate_loops
+from spirited.loops.generate import Group, Loop, Segment, generate_loops
 from spirited.loops.output import loop_to_dict
 from spirited.routing import polyline
 from spirited.scoring.store import ScoreStore
@@ -58,6 +60,28 @@ def test_no_segment_line_has_fewer_than_two_points(tmp_path: Path) -> None:
     for found in result.loops:
         assert all(len(p["path"]) >= 2 for p in viewer.segment_paths(found))
         assert all(len(s["geometry"]["coordinates"]) >= 2 for s in loop_to_dict(found)["segments"])
+
+
+def test_segment_lines_join_up_with_no_gap_between_them() -> None:
+    # Four points about 10 km apart, cut 15 km in: the boundary falls inside a long span,
+    # which neither segment used to draw.
+    step = 10 / 69.6 / math.cos(math.radians(51.4))
+    points = tuple((51.4, -1.0 - i * step) for i in range(4))
+    segments = (
+        Segment(0, 15, "A", Group.RECOMMENDED, 70.0),
+        Segment(15, 30, "B", Group.BUILT_UP, None),
+    )
+    shares = {g: 0.0 for g in Group}
+    loop = Loop((), 30, 40, 35.0, shares, 0.0, points, segments, frozenset())
+    first, second = (p["path"] for p in viewer.segment_paths(loop))
+    assert first[0] == list(points[0])
+    assert second[-1] == list(points[-1])
+    assert first[-1] in second  # the first line reaches into the second
+    covered = {tuple(p) for p in first} | {tuple(p) for p in second}
+    assert covered == set(points)
+    lines = [s["geometry"]["coordinates"] for s in loop_to_dict(loop)["segments"]]
+    for before, after in itertools.pairwise(lines):
+        assert before[-1] in after
 
 
 def test_the_map_page_carries_the_loops_and_the_attribution(loop: Loop) -> None:

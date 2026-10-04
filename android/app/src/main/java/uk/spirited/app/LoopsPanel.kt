@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import uk.spirited.app.api.Loop
 import uk.spirited.app.map.LoopStyle
@@ -34,6 +36,7 @@ import kotlin.math.roundToInt
 /** Drive time, the Find loops button, and the loops that came back as cards to choose between. */
 @Composable
 fun LoopsPanel(viewModel: MapViewModel, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
         Column(
             modifier = Modifier
@@ -78,6 +81,14 @@ fun LoopsPanel(viewModel: MapViewModel, modifier: Modifier = Modifier) {
                         Text("No loop passed the checks from here.", style = MaterialTheme.typography.bodyMedium)
                     } else {
                         LoopCards(loops, viewModel.selectedLoop, viewModel::chooseLoop)
+                        val chosen = loops.getOrNull(viewModel.selectedLoop)
+                        if (chosen != null) {
+                            OutlinedButton(onClick = {
+                                GpxShare.share(context, chosen.gpx, viewModel.selectedLoop + 1, chosen.durationMin)
+                            }) {
+                                Text("Share loop ${viewModel.selectedLoop + 1} as GPX")
+                            }
+                        }
                         Legend()
                         loops.getOrNull(viewModel.selectedLoop)?.warnings?.forEach {
                             Text(it, style = MaterialTheme.typography.bodySmall)
