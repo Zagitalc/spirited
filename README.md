@@ -91,12 +91,13 @@ cd android
 
 The app opens on a map of Berkshire (OpenFreeMap tiles through MapLibre Native). Long-press
 the map to put the start marker down, or tap "Use my location" (the phone asks for permission
-then, and the position is read once and never stored). Loops and GPX export come in the next
-steps of Stage 4.
+then, and the position is read once and never stored). GPX export comes in the next step of Stage 4.
 
 To ask for loops, run `make backend-run-lan` (with Valhalla up) on the computer, tap
 **Backend** in the app, enter the address it prints (`http://192.168.50.10:8000`, say) and
-use **Save and test**. Then choose a start and a drive time and tap **Find loops**. Debug
+use **Save and test**. Then choose a start and a drive time and tap **Find loops**. Each
+loop comes back as a card; tap one to draw it on the map (green: roads Spirited recommends,
+orange: roads it cannot vouch for, grey: built-up streets). Debug
 builds allow plain HTTP for this; a release build will not. The first build needs internet for Gradle and the
 map tiles.
 

@@ -40,23 +40,43 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.lineCap
+import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineJoin
+import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import uk.spirited.app.LoopsPanel
+import uk.spirited.app.LoopsState
 import uk.spirited.app.MapViewModel
 import uk.spirited.app.SettingsSheet
 
 private const val START_SOURCE = "start-source"
 private const val START_LAYER = "start-layer"
+private const val LOOP_SOURCE = "loop-source"
+private const val LOOP_CASING = "loop-casing"
+private const val LOOP_LINE = "loop-line"
+
+private fun colourByGroup(): Expression = Expression.match(
+    Expression.get(LoopStyle.GROUP),
+    Expression.color(LoopStyle.colourOf("")),
+    Expression.stop("recommended", Expression.color(LoopStyle.colourOf("recommended"))),
+    Expression.stop("not_recommended", Expression.color(LoopStyle.colourOf("not_recommended"))),
+    Expression.stop("built_up", Expression.color(LoopStyle.colourOf("built_up"))),
+)
 
 /** A point on the map, kept as plain numbers so it survives rotation. */
 data class Position(val lat: Double, val lon: Double)
@@ -160,6 +180,24 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
                 true
             }
             m.setStyle(MapConfig.STYLE_URL) { style ->
+                // The loop goes in first so the start marker is drawn on top of it.
+                style.addSource(GeoJsonSource(LOOP_SOURCE))
+                style.addLayer(
+                    LineLayer(LOOP_CASING, LOOP_SOURCE).withProperties(
+                        lineColor("#ffffff"),
+                        lineWidth(9f),
+                        lineCap(Property.LINE_CAP_ROUND),
+                        lineJoin(Property.LINE_JOIN_ROUND),
+                    ),
+                )
+                style.addLayer(
+                    LineLayer(LOOP_LINE, LOOP_SOURCE).withProperties(
+                        lineColor(colourByGroup()),
+                        lineWidth(5f),
+                        lineCap(Property.LINE_CAP_ROUND),
+                        lineJoin(Property.LINE_JOIN_ROUND),
+                    ),
+                )
                 style.addSource(GeoJsonSource(START_SOURCE))
                 style.addLayer(
                     CircleLayer(START_LAYER, START_SOURCE).withProperties(
@@ -184,6 +222,25 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
             source.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
         } else {
             source.setGeoJson(Feature.fromGeometry(Point.fromLngLat(start.lon, start.lat)))
+        }
+    }
+
+    // Draw the chosen loop, and fit the map to it when it is a new one.
+    val state = viewModel.loops
+    val shown = (state as? LoopsState.Loaded)?.response?.loops?.getOrNull(viewModel.selectedLoop)
+    LaunchedEffect(map, styleReady, shown) {
+        val style = map?.style ?: return@LaunchedEffect
+        if (!styleReady) return@LaunchedEffect
+        val source = style.getSourceAs<GeoJsonSource>(LOOP_SOURCE) ?: return@LaunchedEffect
+        if (shown == null) {
+            source.setGeoJson(FeatureCollection.fromFeatures(emptyList<Feature>()))
+        } else {
+            source.setGeoJson(LoopStyle.features(shown))
+            val points = shown.geometry.coordinates.map { LatLng(it[1], it[0]) }
+            if (points.size >= 2) {
+                val bounds = LatLngBounds.Builder().includes(points).build()
+                map?.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80))
+            }
         }
     }
 

@@ -36,6 +36,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var loops by mutableStateOf<LoopsState>(LoopsState.Idle)
         private set
+    var selectedLoop by mutableIntStateOf(0)
+        private set
     var backendUrl by mutableStateOf(settings.url)
         private set
     var connectionMessage by mutableStateOf<String?>(null)
@@ -55,6 +57,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private fun forgetLoops() {
         job?.cancel()
         loops = LoopsState.Idle
+        selectedLoop = 0
+    }
+
+    fun chooseLoop(index: Int) {
+        val found = (loops as? LoopsState.Loaded)?.response?.loops ?: return
+        if (index in found.indices) selectedLoop = index
     }
 
     fun requestLoops() {
@@ -64,7 +72,10 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         loops = LoopsState.Loading
         job = viewModelScope.launch {
             loops = when (val result = api.loops(backendUrl, here.lat, here.lon, minutes)) {
-                is ApiResult.Ok -> LoopsState.Loaded(result.value)
+                is ApiResult.Ok -> {
+                    selectedLoop = 0
+                    LoopsState.Loaded(result.value)
+                }
                 is ApiResult.Failed -> LoopsState.Error(result.error.message)
             }
         }

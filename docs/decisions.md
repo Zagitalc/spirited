@@ -480,3 +480,16 @@ alone keeps the safety rule: the allowance excuses streets, not roads we have no
 **Risks accepted.** A loop can now be up to 8 km of streets, 4 at each end, on top of the
 30% built-up limit measured on the rest. Unreported: whether that gives good loops from the
 two Caversham starts; that needs a rerun on the real data.
+
+## 2026-10-04: Loops are drawn from the backend's segments, one loop at a time
+
+**Decision.** The app draws only the chosen loop, as one line per segment coloured by the
+`group` the backend gave it (green recommended, orange cannot vouch for, grey built up), over
+a white casing so it reads on any map. The other loops are cards under the map. An unknown
+group is drawn grey. The app never works out what kind of road a stretch is.
+
+**Why.** Two loops drawn together on one map are hard to tell apart on a phone, and the card
+is where the numbers and warnings go. Taking the group from the backend keeps the phone and
+the dev map page in agreement, and means a change to the rules is a backend change only.
+The colours are not colour-blind safe on their own: the legend names them, and a later pass
+can add dashes for the orange stretches.
