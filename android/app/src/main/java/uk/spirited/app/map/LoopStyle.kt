@@ -18,18 +18,20 @@ object LoopStyle {
     const val BUILT_UP = 0xFF757575.toInt()
 
     /** Anything the backend adds later is drawn grey until the app learns about it. */
-    fun colourOf(group: String): Int = when (group) {
-        "recommended" -> RECOMMENDED
-        "not_recommended" -> NOT_RECOMMENDED
-        else -> BUILT_UP
-    }
+    fun colourOf(group: String): Int =
+        when (group) {
+            "recommended" -> RECOMMENDED
+            "not_recommended" -> NOT_RECOMMENDED
+            else -> BUILT_UP
+        }
 
     /** One line feature per segment, tagged with its group, in driving order. */
-    fun features(loop: Loop): FeatureCollection = FeatureCollection.fromFeatures(
-        loop.segments.map { segment ->
-            // GeoJSON coordinates are [lon, lat].
-            val line = LineString.fromLngLats(segment.geometry.coordinates.map { Point.fromLngLat(it[0], it[1]) })
-            Feature.fromGeometry(line).also { it.addStringProperty(GROUP, segment.group) }
-        },
-    )
+    fun features(loop: Loop): FeatureCollection =
+        FeatureCollection.fromFeatures(
+            loop.segments.map { segment ->
+                // GeoJSON coordinates are [lon, lat].
+                val line = LineString.fromLngLats(segment.geometry.coordinates.map { Point.fromLngLat(it[0], it[1]) })
+                Feature.fromGeometry(line).also { it.addStringProperty(GROUP, segment.group) }
+            },
+        )
 }

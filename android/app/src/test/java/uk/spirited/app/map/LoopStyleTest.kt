@@ -9,24 +9,28 @@ import uk.spirited.app.api.Segment
 import uk.spirited.app.api.Shares
 
 class LoopStyleTest {
-    private fun segment(group: String, vararg points: List<Double>) =
-        Segment(0.0, 1.0, "road", group, null, LineString(points.toList()))
+    private fun segment(
+        group: String,
+        vararg points: List<Double>,
+    ) = Segment(0.0, 1.0, "road", group, null, LineString(points.toList()))
 
-    private val loop = Loop(
-        distanceKm = 10.0,
-        durationMin = 20,
-        score = 50.0,
-        shares = Shares(0.5, 0.25, 0.25),
-        reuseShare = 0.0,
-        geometry = LineString(listOf(listOf(-1.0, 51.0), listOf(-1.1, 51.1))),
-        polyline = "",
-        gpx = "",
-        segments = listOf(
-            segment("recommended", listOf(-1.0, 51.0), listOf(-1.1, 51.1)),
-            segment("built_up", listOf(-1.1, 51.1), listOf(-1.2, 51.2)),
-            segment("not_recommended", listOf(-1.2, 51.2), listOf(-1.3, 51.3)),
-        ),
-    )
+    private val loop =
+        Loop(
+            distanceKm = 10.0,
+            durationMin = 20,
+            score = 50.0,
+            shares = Shares(0.5, 0.25, 0.25),
+            reuseShare = 0.0,
+            geometry = LineString(listOf(listOf(-1.0, 51.0), listOf(-1.1, 51.1))),
+            polyline = "",
+            gpx = "",
+            segments =
+                listOf(
+                    segment("recommended", listOf(-1.0, 51.0), listOf(-1.1, 51.1)),
+                    segment("built_up", listOf(-1.1, 51.1), listOf(-1.2, 51.2)),
+                    segment("not_recommended", listOf(-1.2, 51.2), listOf(-1.3, 51.3)),
+                ),
+        )
 
     @Test
     fun `each segment becomes one feature carrying the backend's group, in order`() {

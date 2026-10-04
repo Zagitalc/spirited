@@ -19,13 +19,19 @@ sealed interface LoopsState {
 
     data object Loading : LoopsState
 
-    data class Loaded(val response: LoopsResponse) : LoopsState
+    data class Loaded(
+        val response: LoopsResponse,
+    ) : LoopsState
 
-    data class Error(val message: String) : LoopsState
+    data class Error(
+        val message: String,
+    ) : LoopsState
 }
 
 /** Holds what the person has chosen and what the backend said, across rotation and backgrounding. */
-class MapViewModel(application: Application) : AndroidViewModel(application) {
+class MapViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val settings = BackendSettings(application)
     private val api = SpiritedApi()
     private var job: Job? = null
@@ -70,15 +76,17 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         // A second tap while waiting does nothing.
         if (loops is LoopsState.Loading) return
         loops = LoopsState.Loading
-        job = viewModelScope.launch {
-            loops = when (val result = api.loops(backendUrl, here.lat, here.lon, minutes)) {
-                is ApiResult.Ok -> {
-                    selectedLoop = 0
-                    LoopsState.Loaded(result.value)
-                }
-                is ApiResult.Failed -> LoopsState.Error(result.error.message)
+        job =
+            viewModelScope.launch {
+                loops =
+                    when (val result = api.loops(backendUrl, here.lat, here.lon, minutes)) {
+                        is ApiResult.Ok -> {
+                            selectedLoop = 0
+                            LoopsState.Loaded(result.value)
+                        }
+                        is ApiResult.Failed -> LoopsState.Error(result.error.message)
+                    }
             }
-        }
     }
 
     /** Returns false, with a message, if the text cannot be an address. */
@@ -98,10 +106,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun testConnection() {
         connectionMessage = "Testing..."
         viewModelScope.launch {
-            connectionMessage = when (val result = api.health(backendUrl)) {
-                is ApiResult.Ok -> "Connected: the backend says ${result.value.status}."
-                is ApiResult.Failed -> result.error.message
-            }
+            connectionMessage =
+                when (val result = api.health(backendUrl)) {
+                    is ApiResult.Ok -> "Connected: the backend says ${result.value.status}."
+                    is ApiResult.Failed -> result.error.message
+                }
         }
     }
 

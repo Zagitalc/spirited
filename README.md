@@ -16,7 +16,9 @@ speed limit, how often you meet junctions and villages, and elevation change.
 Stage 4 of 5. The OSM extract pipeline, the road safety filter, car routing with
 Valhalla, road scoring and a first version of loop generation exist. The scoring
 weights and the loop limits are first guesses, checked against sixteen roads and the
-loops from four start points. The app so far is a map; it cannot request loops yet.
+loops from a handful of start points. The app shows a map, asks the backend for loops from a
+start you choose, draws them and shares one as GPX. It needs the backend running on your own
+computer; nothing is hosted yet.
 
 | Stage | What | State |
 | --- | --- | --- |
@@ -241,7 +243,9 @@ reference roads with known verdicts (see `docs/decisions.md`).
   85% of Valhalla's free-flow figures, which has not been checked against a drive.
 - A loop near the edge of the covered area, or from a start with only one way out, may
   retrace part of its road or be cut short.
-- Nothing has been tested on a phone yet.
+- The app has been tried on one phone (a Samsung S25 Ultra) and one person has looked at the loops.
+  It has not been driven, and the GPX has only been opened in Google My Maps, not followed in a
+  navigation app.
 
 ## Data and licences
 

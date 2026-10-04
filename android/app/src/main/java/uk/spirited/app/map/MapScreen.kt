@@ -70,23 +70,36 @@ private const val LOOP_SOURCE = "loop-source"
 private const val LOOP_CASING = "loop-casing"
 private const val LOOP_LINE = "loop-line"
 
-private fun colourByGroup(): Expression = Expression.match(
-    Expression.get(LoopStyle.GROUP),
-    Expression.color(LoopStyle.colourOf("")),
-    Expression.stop("recommended", Expression.color(LoopStyle.colourOf("recommended"))),
-    Expression.stop("not_recommended", Expression.color(LoopStyle.colourOf("not_recommended"))),
-    Expression.stop("built_up", Expression.color(LoopStyle.colourOf("built_up"))),
-)
+private fun colourByGroup(): Expression =
+    Expression.match(
+        Expression.get(LoopStyle.GROUP),
+        Expression.color(LoopStyle.colourOf("")),
+        Expression.stop("recommended", Expression.color(LoopStyle.colourOf("recommended"))),
+        Expression.stop("not_recommended", Expression.color(LoopStyle.colourOf("not_recommended"))),
+        Expression.stop("built_up", Expression.color(LoopStyle.colourOf("built_up"))),
+    )
 
 /** A point on the map, kept as plain numbers so it survives rotation. */
-data class Position(val lat: Double, val lon: Double)
-
-private val CameraSaver = listSaver<CameraPosition?, Double>(
-    save = { c -> if (c == null) emptyList() else listOf(c.target!!.latitude, c.target!!.longitude, c.zoom) },
-    restore = { l ->
-        if (l.size == 3) CameraPosition.Builder().target(LatLng(l[0], l[1])).zoom(l[2]).build() else null
-    },
+data class Position(
+    val lat: Double,
+    val lon: Double,
 )
+
+private val CameraSaver =
+    listSaver<CameraPosition?, Double>(
+        save = { c -> if (c == null) emptyList() else listOf(c.target!!.latitude, c.target!!.longitude, c.zoom) },
+        restore = { l ->
+            if (l.size == 3) {
+                CameraPosition
+                    .Builder()
+                    .target(LatLng(l[0], l[1]))
+                    .zoom(l[2])
+                    .build()
+            } else {
+                null
+            }
+        },
+    )
 
 /**
  * The map, the start marker and the controls under it. Long-press puts the start where the finger is.
@@ -94,7 +107,10 @@ private val CameraSaver = listSaver<CameraPosition?, Double>(
  * draws stay visible: the map data licence needs them.
  */
 @Composable
-fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
+fun MapScreen(
+    viewModel: MapViewModel,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember { MapView(context) }
@@ -129,31 +145,33 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { granted ->
-        if (granted.values.any { it }) {
-            permissionBlocked = false
-            locate()
-        } else {
-            // After a refusal Android may stop showing the prompt, so the way back is the app's settings page.
-            permissionBlocked = true
-            message = "Location permission is off. Allow it in the app's settings, or long-press the map."
-        }
-    }
-
-    DisposableEffect(lifecycle, mapView) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
-                else -> Unit
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) { granted ->
+            if (granted.values.any { it }) {
+                permissionBlocked = false
+                locate()
+            } else {
+                // After a refusal Android may stop showing the prompt, so the way back is the app's settings page.
+                permissionBlocked = true
+                message = "Location permission is off. Allow it in the app's settings, or long-press the map."
             }
         }
+
+    DisposableEffect(lifecycle, mapView) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_CREATE -> mapView.onCreate(null)
+                    Lifecycle.Event.ON_START -> mapView.onStart()
+                    Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                    Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                    Lifecycle.Event.ON_STOP -> mapView.onStop()
+                    Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                    else -> Unit
+                }
+            }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
@@ -169,7 +187,8 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(mapView) {
         mapView.getMapAsync { m ->
             m.cameraPosition = camera
-                ?: CameraPosition.Builder()
+                ?: CameraPosition
+                    .Builder()
                     .target(LatLng(MapConfig.INITIAL_LAT, MapConfig.INITIAL_LON))
                     .zoom(MapConfig.INITIAL_ZOOM)
                     .build()
@@ -248,17 +267,19 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
         Box(modifier = Modifier.weight(1f).fillMaxSize()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
             Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(12.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Card(modifier = Modifier.weight(1f, fill = false)) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                        val text = message
-                            ?: start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
-                            ?: "Long-press the map to choose where to start"
+                        val text =
+                            message
+                                ?: start?.let { "Start: %.4f, %.4f".format(it.lat, it.lon) }
+                                ?: "Long-press the map to choose where to start"
                         Text(text = text, style = MaterialTheme.typography.bodyMedium)
                         if (permissionBlocked) {
                             TextButton(onClick = {
@@ -274,13 +295,15 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
             }
             ExtendedFloatingActionButton(
                 onClick = {
-                    val permissions = arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                    )
-                    val granted = permissions.any {
-                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                    }
+                    val permissions =
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        )
+                    val granted =
+                        permissions.any {
+                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                        }
                     if (granted) {
                         permissionBlocked = false
                         if (!locating) locate()
@@ -288,9 +311,10 @@ fun MapScreen(viewModel: MapViewModel, modifier: Modifier = Modifier) {
                         permissionLauncher.launch(permissions)
                     }
                 },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
             ) {
                 Text("Use my location")
             }

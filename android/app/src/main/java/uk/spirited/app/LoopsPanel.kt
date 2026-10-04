@@ -35,16 +35,20 @@ import kotlin.math.roundToInt
 
 /** Drive time, the Find loops button, and the loops that came back as cards to choose between. */
 @Composable
-fun LoopsPanel(viewModel: MapViewModel, modifier: Modifier = Modifier) {
+fun LoopsPanel(
+    viewModel: MapViewModel,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     Surface(modifier = modifier.fillMaxWidth(), tonalElevation = 3.dp) {
         Column(
-            modifier = Modifier
-                // Long notes scroll instead of squeezing the map away.
-                .heightIn(max = 340.dp)
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    // Long notes scroll instead of squeezing the map away.
+                    .heightIn(max = 340.dp)
+                    .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
+                    .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("Drive time: ${formatMinutes(viewModel.minutes)}", style = MaterialTheme.typography.titleSmall)
@@ -110,14 +114,19 @@ private fun formatMinutes(minutes: Int): String =
     if (minutes < 60) "$minutes min" else "${minutes / 60} h ${"%02d".format(minutes % 60)} min"
 
 @Composable
-private fun LoopCards(loops: List<Loop>, selected: Int, onSelect: (Int) -> Unit) {
+private fun LoopCards(
+    loops: List<Loop>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         loops.forEachIndexed { index, loop ->
-            val colours = if (index == selected) {
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            } else {
-                CardDefaults.cardColors()
-            }
+            val colours =
+                if (index == selected) {
+                    CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                } else {
+                    CardDefaults.cardColors()
+                }
             Card(
                 modifier = Modifier.weight(1f).clickable { onSelect(index) },
                 colors = colours,
@@ -143,7 +152,10 @@ private fun Legend() {
 }
 
 @Composable
-private fun LegendItem(colour: Int, label: String) {
+private fun LegendItem(
+    colour: Int,
+    label: String,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(modifier = Modifier.size(10.dp).background(Color(colour), CircleShape))
         Text(label, style = MaterialTheme.typography.bodySmall)

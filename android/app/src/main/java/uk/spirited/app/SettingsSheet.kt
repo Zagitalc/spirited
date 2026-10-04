@@ -24,7 +24,10 @@ import androidx.compose.ui.unit.dp
 /** Where the backend is, with a way to check it answers. For development until Stage 5 hosts it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsSheet(viewModel: MapViewModel, onDismiss: () -> Unit) {
+fun SettingsSheet(
+    viewModel: MapViewModel,
+    onDismiss: () -> Unit,
+) {
     var text by remember { mutableStateOf(viewModel.backendUrl) }
     ModalBottomSheet(onDismissRequest = {
         viewModel.clearConnectionMessage()

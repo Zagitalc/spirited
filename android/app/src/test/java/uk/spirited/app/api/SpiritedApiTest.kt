@@ -26,7 +26,8 @@ class SpiritedApiTest {
         server.shutdown()
     }
 
-    private val loopsJson = """
+    private val loopsJson =
+        """
         {"loops": [{
           "distance_km": 74.6, "duration_min": 90, "score": 63.4,
           "shares": {"recommended": 0.81, "not_recommended": 0.07, "built_up": 0.12},
@@ -40,7 +41,7 @@ class SpiritedApiTest {
           "warnings": ["7% of this loop is on roads we cannot vouch for"],
           "a_field_added_later": true
         }], "notes": []}
-    """.trimIndent()
+        """.trimIndent()
 
     private fun loops() = runBlocking { api.loops(base, 51.4046, -1.4430, 90) }
 

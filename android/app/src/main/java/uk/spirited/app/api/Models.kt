@@ -7,7 +7,10 @@ import kotlinx.serialization.Serializable
 // so the backend can add fields without breaking an installed app.
 
 @Serializable
-data class StartPoint(val lat: Double, val lon: Double)
+data class StartPoint(
+    val lat: Double,
+    val lon: Double,
+)
 
 @Serializable
 data class LoopRequest(
@@ -18,7 +21,9 @@ data class LoopRequest(
 
 /** GeoJSON, so each coordinate is [lon, lat]. */
 @Serializable
-data class LineString(val coordinates: List<List<Double>>)
+data class LineString(
+    val coordinates: List<List<Double>>,
+)
 
 @Serializable
 data class Shares(
@@ -59,4 +64,7 @@ data class LoopsResponse(
 )
 
 @Serializable
-data class Health(val status: String, val version: String = "")
+data class Health(
+    val status: String,
+    val version: String = "",
+)

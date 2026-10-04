@@ -4,7 +4,9 @@ import android.content.Context
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Where the backend lives. Not a secret: a computer's address on the local network. */
-class BackendSettings(context: Context) {
+class BackendSettings(
+    context: Context,
+) {
     private val prefs = context.getSharedPreferences("spirited", Context.MODE_PRIVATE)
 
     var url: String
