@@ -577,3 +577,21 @@ turning at a junction or roundabout.
 **Risks accepted.** Some loops that need a short out-and-back to reach a good road are now rejected,
 so a start may return fewer than three loops. Checked: the limit rejects the real GPX. Not checked:
 how many loops survive on the real data, which LonZac's next run will show.
+
+## 2026-10-08: Four correctness fixes from the routing audit
+
+**Decision.**
+1. A loop now treats a corridor as recommended only if the scorer stored it as recommendable.
+   Before, it checked eligibility and confidence itself and so counted corridors under 1 km as recommended.
+2. Two loops are compared by the kilometres they share, not by the number of shared edges.
+3. The search stops when it has nine loops that are different from each other, not nine passing loops.
+4. The score store can be opened on one thread and used or closed on another.
+
+**Why.** LonZac's audit found all four and reproduced the last two. A road cut into many short edges
+used to look different from the same road in one edge. Nine copies of one loop stopped the search
+before it had seen three different loops. Two requests at once failed with a SQLite thread error.
+
+**Risks accepted.** Fix 1 makes loops harder to pass, because short corridors now count against the
+recommended share and the limits on roads we cannot vouch for. The audit measured one 90 minute loop
+from Caversham going to zero. The search has to find better loops to make up for it. Not measured
+here: the effect on real data, which needs LonZac's next run.

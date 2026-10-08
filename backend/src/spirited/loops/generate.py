@@ -71,7 +71,8 @@ def classify(row: sqlite3.Row | None) -> Group:
         return Group.NOT_RECOMMENDED
     reason = row["ineligible"]
     if reason is None:
-        return Group.RECOMMENDED if row["confidence"] >= c.MIN_CONFIDENCE else Group.NOT_RECOMMENDED
+        # The scorer's own decision, which also leaves out corridors shorter than 1 km.
+        return Group.RECOMMENDED if row["recommendable"] else Group.NOT_RECOMMENDED
     return Group.BUILT_UP if reason in _BUILT_UP_REASONS else Group.NOT_RECOMMENDED
 
 
@@ -95,7 +96,8 @@ class Loop:
     reuse_share: float
     points: tuple[LatLon, ...] = field(repr=False)
     segments: tuple[Segment, ...] = field(repr=False)
-    edge_keys: frozenset[tuple[object, ...]] = field(repr=False)
+    # Kilometres driven on each edge (keyed as `Edge.key`), for telling loops apart.
+    edge_km: dict[tuple[object, ...], float] = field(repr=False)
     warnings: tuple[str, ...] = ()
 
 
@@ -220,6 +222,7 @@ def evaluate_route(
     score_km = 0.0
     longest_run = run = 0.0
     seen: set[tuple[object, ...]] = set()
+    edge_km: dict[tuple[object, ...], float] = {}
     reused_km = 0.0
     segments: list[Segment] = []
     along = 0.0
@@ -247,6 +250,7 @@ def evaluate_route(
         else:
             retrace = 0.0
         seen.add(edge.key)
+        edge_km[edge.key] = edge_km.get(edge.key, 0.0) + edge.length_km
 
         key = (None if row is None else int(row["id"]), group)
         if key == last_key and segments:
@@ -302,7 +306,7 @@ def evaluate_route(
         reuse_share=reuse,
         points=route.points,
         segments=tuple(segments),
-        edge_keys=frozenset(seen),
+        edge_km=edge_km,
         warnings=tuple(warnings),
     )
 
@@ -519,8 +523,20 @@ def route_loop(
     return route, edges
 
 
-def _overlap(a: frozenset[tuple[object, ...]], b: frozenset[tuple[object, ...]]) -> float:
-    return len(a & b) / max(1, min(len(a), len(b)))
+def _overlap(a: dict[tuple[object, ...], float], b: dict[tuple[object, ...], float]) -> float:
+    """The share of the shorter loop's distance that the other loop also drives. Measured
+    in kilometres, so how a road happens to be cut into edges does not change the answer."""
+    shared = sum(min(km, b[key]) for key, km in a.items() if key in b)
+    return shared / max(1e-9, min(sum(a.values()), sum(b.values())))
+
+
+def _distinct(loops: Sequence[Loop], config: LoopConfig) -> list[Loop]:
+    """The loops that are not copies of an earlier one in the list."""
+    kept: list[Loop] = []
+    for loop in loops:
+        if all(_overlap(loop.edge_km, other.edge_km) <= config.duplicate_overlap for other in kept):
+            kept.append(loop)
+    return kept
 
 
 def generate_loops(
@@ -582,7 +598,8 @@ def generate_loops(
                 result.also_fails["fits" if isinstance(other, Loop) else other] += 1
         else:
             passing.append(outcome)
-        if len(passing) >= count * 3:
+        # Stop on distinct loops, not on raw ones: nine near-copies of one loop are one loop.
+        if len(_distinct(passing, config)) >= count * 3:
             break
 
     # Best score first, with a small penalty for missing the target time so that, between
@@ -592,8 +609,7 @@ def generate_loops(
 
     for loop in sorted(passing, key=lambda lp: -rank(lp)):
         if any(
-            _overlap(loop.edge_keys, kept.edge_keys) > config.duplicate_overlap
-            for kept in result.loops
+            _overlap(loop.edge_km, kept.edge_km) > config.duplicate_overlap for kept in result.loops
         ):
             result.rejected["duplicate"] += 1
             continue
@@ -603,7 +619,7 @@ def generate_loops(
 
     if len(result.loops) < count and result.rejected:
         reasons = ", ".join(
-            f"{n} {REJECTION_TEXT.get(key, key)}" for key, n in result.rejected.most_common(3)
+            f"{n} {REJECTION_TEXT.get(key, key)}" for key, n in result.rejected.most_common()
         )
         result.notes.append(
             f"Found {len(result.loops)} of {count} loops. Of {result.candidates_tried} "

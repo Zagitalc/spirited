@@ -38,7 +38,7 @@ def make_store(path: Path, scores: dict[int, float] | None = None) -> dict[int, 
         """
         CREATE TABLE corridors (
             id INTEGER PRIMARY KEY, highway TEXT, label TEXT, length_m REAL,
-            ineligible TEXT, confidence REAL, score REAL
+            ineligible TEXT, confidence REAL, score REAL, recommendable INTEGER
         );
         CREATE TABLE anchors (corridor_id INTEGER, lon REAL, lat REAL);
         CREATE TABLE corridor_ways (way_id INTEGER PRIMARY KEY, corridor_id INTEGER);
@@ -50,7 +50,7 @@ def make_store(path: Path, scores: dict[int, float] | None = None) -> dict[int, 
         lat, lon = ring_point(45 * i)
         mids[corridor] = (lat, lon)
         db.execute(
-            "INSERT INTO corridors VALUES (?, 'tertiary', ?, ?, NULL, 0.9, ?)",
+            "INSERT INTO corridors VALUES (?, 'tertiary', ?, ?, NULL, 0.9, ?, 1)",
             (corridor, f"B{4000 + corridor}", ANCHOR_KM * 1000, scores.get(corridor, 70.0)),
         )
         db.execute("INSERT INTO anchors VALUES (?, ?, ?)", (corridor, lon, lat))
@@ -66,8 +66,15 @@ def make_store(path: Path, scores: dict[int, float] | None = None) -> dict[int, 
     }
     for corridor, (highway, ineligible, confidence, score) in kinds.items():
         db.execute(
-            "INSERT INTO corridors VALUES (?, ?, 'X', 1000, ?, ?, ?)",
-            (corridor, highway, ineligible, confidence if confidence is not None else 0.9, score),
+            "INSERT INTO corridors VALUES (?, ?, 'X', 1000, ?, ?, ?, ?)",
+            (
+                corridor,
+                highway,
+                ineligible,
+                confidence if confidence is not None else 0.9,
+                score,
+                int(ineligible is None and (confidence is None or confidence >= 0.6)),
+            ),
         )
         db.execute("INSERT INTO corridor_ways VALUES (?, ?)", (corridor * 10, corridor))
     db.commit()

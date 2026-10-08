@@ -15,7 +15,9 @@ from spirited.loops.generate import (
     Group,
     Loop,
     OutsideRegion,
+    _distinct,
     _longest_retrace_km,
+    _overlap,
     choose_anchors,
     classify,
     evaluate_route,
@@ -370,3 +372,38 @@ def test_a_spur_whose_edges_do_not_match_is_still_rejected(store: ScoreStore) ->
     edges = [Edge(10, ("x",), km, ends=((i, 0.0), (i, 1.0))) for i, km in enumerate(kms)]
     route = Route(40, 50 * CONFIG.speed_factor * 60, (), square_with_spur(1.5, 5))
     assert evaluate_route(route, edges, [START], store, 50, CONFIG) == "retrace"
+
+
+# --- one rule for what is recommended, and loops told apart by distance ----------
+
+
+def test_a_corridor_the_scorer_did_not_recommend_is_not_recommended_in_a_loop() -> None:
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    db.execute("CREATE TABLE c (ineligible TEXT, confidence REAL, recommendable INTEGER)")
+    # Confident and eligible, but under 1 km, so the scorer left it out.
+    db.execute("INSERT INTO c VALUES (NULL, 0.9, 0)")
+    db.execute("INSERT INTO c VALUES (NULL, 0.9, 1)")
+    short, long = db.execute("SELECT * FROM c").fetchall()
+    assert classify(short) is Group.NOT_RECOMMENDED
+    assert classify(long) is Group.RECOMMENDED
+
+
+def test_overlap_is_measured_in_distance_not_in_edges() -> None:
+    one_long: dict[tuple[object, ...], float] = {("a",): 10.0, ("b", 1): 0.01}
+    many_short: dict[tuple[object, ...], float] = {("a",): 10.0}
+    many_short.update({("c", i): 0.01 for i in range(10)})
+    assert _overlap(one_long, many_short) > 0.98
+    assert _overlap({("a",): 5.0}, {("b",): 5.0}) == 0.0
+
+
+def make_loop(edge_km: dict[tuple[object, ...], float]) -> Loop:
+    shares = dict.fromkeys(Group, 0.0)
+    return Loop((), sum(edge_km.values()), 60.0, 30.0, shares, 0.0, (), (), edge_km)
+
+
+def test_copies_of_one_loop_count_once() -> None:
+    copy: dict[tuple[object, ...], float] = {("a",): 10.0}
+    other: dict[tuple[object, ...], float] = {("b",): 10.0}
+    loops = [make_loop(copy) for _ in range(9)] + [make_loop(other)]
+    assert len(_distinct(loops, CONFIG)) == 2

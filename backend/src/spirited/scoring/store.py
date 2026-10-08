@@ -15,7 +15,9 @@ class ScoreStore:
     def __init__(self, path: Path) -> None:
         if not path.exists():
             raise FileNotFoundError(f"{path} not found: run `make scores` first")
-        self._db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        # Read only and used by one request at a time, but FastAPI may open it on one worker
+        # thread and use or close it on another, which sqlite3 refuses by default.
+        self._db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
 
     def close(self) -> None:

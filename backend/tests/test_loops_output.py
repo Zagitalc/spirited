@@ -72,7 +72,7 @@ def test_segment_lines_join_up_with_no_gap_between_them() -> None:
         Segment(15, 30, "B", Group.BUILT_UP, None),
     )
     shares = {g: 0.0 for g in Group}
-    loop = Loop((), 30, 40, 35.0, shares, 0.0, points, segments, frozenset())
+    loop = Loop((), 30, 40, 35.0, shares, 0.0, points, segments, {})
     first, second = (p["path"] for p in viewer.segment_paths(loop))
     assert first[0] == list(points[0])
     assert second[-1] == list(points[-1])
