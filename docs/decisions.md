@@ -563,3 +563,17 @@ driven twice. The shape cannot be fooled that way.
 synthetic map, so the shape check is the fix by reasoning and by tests, and LonZac's next run is the
 evidence. A road driven past in opposite directions on separate occasions that touches for over
 0.5 km would also be rejected.
+
+## 2026-10-08: Retrace limit cut from 0.5 km to 0.1 km
+
+**Decision.** `max_retrace_run_km` is now 0.1 km.
+
+**Why.** LonZac sent the GPX of a loop that still had a U-turn after the shape check. Running the
+shape check on that file (the first test on real data) found one stub of 0.27 km, which is the
+whole U-turn: about 270 m out of the way driven back the same way. It sat under the 0.5 km limit, which was a guess
+made before I had seen a real one. 0.1 km rejects it and still allows the few tens of metres of
+turning at a junction or roundabout.
+
+**Risks accepted.** Some loops that need a short out-and-back to reach a good road are now rejected,
+so a start may return fewer than three loops. Checked: the limit rejects the real GPX. Not checked:
+how many loops survive on the real data, which LonZac's next run will show.

@@ -139,8 +139,11 @@ def test_a_spur_driven_out_and_back_is_a_u_turn_however_small_a_share(store: Sco
     # 0.6 km out and 0.6 km back is only 3% of the loop, inside the reuse limit.
     spur = edges_of((10, 9), (30, 0.6), (30, 0.6), (20, 9))
     assert check(store, spur) == "retrace"
+    # A quarter of a kilometre is still a U-turn: LonZac's phone test showed one that size.
+    stub = edges_of((10, 9), (30, 0.25), (30, 0.25), (20, 9))
+    assert check(store, stub) == "retrace"
     # Short retraces, such as turning at a junction, are fine.
-    short = edges_of((10, 9), (30, 0.3), (30, 0.3), (20, 9))
+    short = edges_of((10, 9), (30, 0.05), (30, 0.05), (20, 9))
     assert isinstance(check(store, short), Loop)
 
 
@@ -345,7 +348,8 @@ def square_with_spur(spur_km: float, at_km: float) -> tuple[tuple[float, float],
 
 def test_a_spur_is_found_from_the_route_shape_alone() -> None:
     assert _longest_retrace_km(square_with_spur(1.5, 5), 4.0) > 1.4
-    assert _longest_retrace_km(square_with_spur(0.2, 5), 4.0) < 0.3
+    assert _longest_retrace_km(square_with_spur(0.05, 5), 4.0) < 0.1
+    assert _longest_retrace_km(square_with_spur(0.25, 5), 4.0) > 0.2
     assert _longest_retrace_km(square_with_spur(1.5, 8), 4.0) > 1.4
 
 
