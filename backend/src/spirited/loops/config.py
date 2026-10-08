@@ -26,6 +26,11 @@ class LoopConfig:
     town_allowance_km: float = 4.0
     # Share of a loop that may repeat a way it has already used.
     max_reuse_share: float = 0.10
+    # No single stretch of that may be longer than this: a loop that drives down a road and
+    # comes back the same way is a U-turn however little of the loop it is. Retracing in the
+    # last `town_allowance_km` is left alone: a start on a dead-end street cannot avoid it.
+    # Measured on the shape of the route as well as on its edges.
+    max_retrace_run_km: float = 0.5
     # A loop must stay this many degrees inside the edge of the data.
     edge_margin_deg: float = 0.02
     # Waypoints are chosen inside the isochrone at this share of the target (Valhalla) time.

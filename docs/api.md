@@ -89,7 +89,7 @@ Response `200`:
 A loop passes only if it takes the requested time, has at least 55% of its length on
 recommended roads, at most 15% on roads in `not_recommended` (and no stretch of those
 over 2 km), at most 30% built up (built-up road in the first and last 4 km is not counted, so a start in a town
-is not penalised for leaving it; the reported `shares` still count every kilometre), repeats at most 10% of its own roads, stays clear of the
+is not penalised for leaving it; the reported `shares` still count every kilometre), repeats at most 10% of its own roads, never turns back along the same road for more than 0.5 km at a stretch (outside the first and last 4 km, where a dead-end start has to come back out), stays clear of the
 edge of the data and uses no motorway.
 
 Errors:

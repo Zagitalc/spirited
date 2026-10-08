@@ -532,3 +532,34 @@ cope with it.
 
 **Not yet checked.** The new layout has not been seen on a device, and tablets and split screen
 may need their own rules.
+
+## 2026-10-04: Loops may not turn back down a road
+
+**Decision.** A loop is turned down if it drives along the same road in the opposite direction for
+more than 0.5 km in one go. The first and last 4 km are exempt. `--max-retrace` on the command
+line changes the 0.5 km.
+
+**Why.** LonZac saw a loop near Binfield that drove down a spur and came back along it. A spur of
+about 2 km is under the 10% limit on repeated road, which measures the total and not the shape, so
+it passed. A U-turn is also a bad drive in itself. The exemption is there because a start on a
+dead-end road has to leave by the way it came.
+
+**Risks accepted.** The 0.5 km is a guess. A loop that has to use a short out-and-back to reach a
+good road is rejected, and fewer loops may come back from some starts. Unverified on real data
+here: that needs a rerun from the Caversham starts.
+
+## 2026-10-08: Retrace is measured on the route's shape as well
+
+**Decision.** The check that rejects a loop for turning back down a road now also looks at the
+shape of the route: a stretch counts as retraced where the route passes within 12 m of earlier
+road going the opposite way. The same 0.5 km limit applies, and the last 4 km are still exempt.
+
+**Why.** LonZac's rerun after the first retrace limit still showed a spur south of the B3018 near
+Binfield in two of three loops. The first check compared graph edges, and a waypoint in the middle
+of an edge splits it into two partial edges, so a spur that is one edge long never shows up as
+driven twice. The shape cannot be fooled that way.
+
+**Risks accepted.** Unverified on the real data: I could reproduce the edge lists only on a
+synthetic map, so the shape check is the fix by reasoning and by tests, and LonZac's next run is the
+evidence. A road driven past in opposite directions on separate occasions that touches for over
+0.5 km would also be rejected.

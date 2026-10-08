@@ -123,6 +123,7 @@ REJECTION_TEXT = {
     "run": "had a long stretch of road we cannot vouch for",
     "built_up": "spent too long in built-up areas",
     "reuse": "repeated too much of its own road",
+    "retrace": "turned back on itself down a road",
     "duplicate": "was too like a better loop",
     "route": "could not be routed",
 }
@@ -137,6 +138,61 @@ def _inside_data(points: Iterable[LatLon], margin: float) -> bool:
         and CLIP_BOX.min_lat + margin <= lat <= CLIP_BOX.max_lat - margin
         for lat, lon in points
     )
+
+
+def _longest_retrace_km(
+    points: Sequence[LatLon], exempt_km: float, step_m: float = 10.0, near_m: float = 12.0
+) -> float:
+    """The longest stretch of the route that runs back over road it has already driven.
+
+    This looks at the shape of the route, not at the graph edges: a waypoint in the middle
+    of an edge splits it into two partial edges, and the edge lists then no longer show that
+    the road was driven twice. A point counts as retraced when an earlier part of the route
+    passed within `near_m` of it going the opposite way. The last `exempt_km` is not held
+    against the loop, because a start on a dead-end road has to come back out of it.
+    """
+    if len(points) < 2:
+        return 0.0
+    xy = to_xy(np.array([[lon, lat] for lat, lon in points]))
+    fine: list[tuple[float, float, float, float, float]] = []  # x, y, along, ux, uy
+    along = 0.0
+    for a, b in pairwise(xy):
+        length = float(np.hypot(*(b - a)))
+        if length < 1e-6:
+            continue
+        ux, uy = (b - a) / length
+        for k in range(max(1, math.ceil(length / step_m))):
+            t = k * length / max(1, math.ceil(length / step_m))
+            fine.append((a[0] + ux * t, a[1] + uy * t, along + t, ux, uy))
+        along += length
+    cells: dict[tuple[int, int], list[int]] = {}
+    longest = run = gap = 0.0
+    last_along = 0.0
+    limit = along - exempt_km * 1000
+    for i, (x, y, at, ux, uy) in enumerate(fine):
+        cx, cy = int(x // near_m), int(y // near_m)
+        back = any(
+            at - fine[j][2] > 3 * step_m
+            and math.hypot(fine[j][0] - x, fine[j][1] - y) <= near_m
+            and fine[j][3] * ux + fine[j][4] * uy < -0.7
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for j in cells.get((cx + dx, cy + dy), ())
+        )
+        cells.setdefault((cx, cy), []).append(i)
+        if at > limit:
+            break
+        step = at - last_along
+        last_along = at
+        if back:
+            run += step + gap
+            gap = 0.0
+            longest = max(longest, run)
+        else:
+            gap += step
+            if gap > 4 * step_m:
+                run = gap = 0.0
+    return longest / 1000
 
 
 def evaluate_route(
@@ -169,6 +225,7 @@ def evaluate_route(
     along = 0.0
     last_key: tuple[int | None, Group] | None = None
     free_km = 0.0  # built-up road near the start or the end, not held against the loop
+    retrace = longest_retrace = 0.0
     for edge in edges:
         row = rows.get(edge.way_id)
         group = classify(row)
@@ -184,6 +241,11 @@ def evaluate_route(
         longest_run = max(longest_run, run)
         if edge.key in seen:
             reused_km += edge.length_km
+            if along + edge.length_km <= total_km - config.town_allowance_km:
+                retrace += edge.length_km
+                longest_retrace = max(longest_retrace, retrace)
+        else:
+            retrace = 0.0
         seen.add(edge.key)
 
         key = (None if row is None else int(row["id"]), group)
@@ -220,6 +282,9 @@ def evaluate_route(
         return "built_up"
     if reuse > config.max_reuse_share:
         return "reuse"
+    retraced = _longest_retrace_km(route.points, config.town_allowance_km)
+    if max(longest_retrace, retraced) > config.max_retrace_run_km:
+        return "retrace"
 
     warnings = []
     if shares[Group.NOT_RECOMMENDED] >= 0.05:

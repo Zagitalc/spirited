@@ -15,6 +15,7 @@ from spirited.loops.generate import (
     Group,
     Loop,
     OutsideRegion,
+    _longest_retrace_km,
     choose_anchors,
     classify,
     evaluate_route,
@@ -55,13 +56,22 @@ def test_corridors_fall_into_three_groups(store: ScoreStore) -> None:
 
 
 def make_route(km: float, valhalla_minutes: float) -> Route:
-    """A route that runs from the start to a point `km` east and back."""
-    far = (START[0], START[1] + km / 2 / 69.5)
+    """A route that drives a square of `km` all round, starting and ending at the start."""
+    side = km / 4
+    dlat, dlon = side / 111.0, side / 69.5
+    lat, lon = START
+    corners = (
+        (lat, lon),
+        (lat, lon + dlon),
+        (lat + dlat, lon + dlon),
+        (lat + dlat, lon),
+        (lat, lon),
+    )
     return Route(
         distance_km=km,
         duration_s=valhalla_minutes * 60,
         leg_shapes=(),
-        points=(START, far, START),
+        points=corners,
     )
 
 
@@ -125,9 +135,24 @@ def test_built_up_road_near_the_start_and_end_is_not_held_against_a_loop(store: 
     assert check(store, edges_of((200, 10), (10, 10))) == "built_up"
 
 
+def test_a_spur_driven_out_and_back_is_a_u_turn_however_small_a_share(store: ScoreStore) -> None:
+    # 0.6 km out and 0.6 km back is only 3% of the loop, inside the reuse limit.
+    spur = edges_of((10, 9), (30, 0.6), (30, 0.6), (20, 9))
+    assert check(store, spur) == "retrace"
+    # Short retraces, such as turning at a junction, are fine.
+    short = edges_of((10, 9), (30, 0.3), (30, 0.3), (20, 9))
+    assert isinstance(check(store, short), Loop)
+
+
+def test_retracing_the_street_a_loop_starts_on_is_allowed(store: ScoreStore) -> None:
+    # A start on a dead end must come back out of it: the last few km are not held to the limit.
+    dead_end = edges_of((30, 0.6), (10, 18), (30, 0.6))
+    assert isinstance(check(store, dead_end), Loop)
+
+
 def test_a_run_of_unrecommended_road_is_measured_in_one_stretch(store: ScoreStore) -> None:
     # Two 1.5 km pieces with good road between them are fine; side by side they are not.
-    apart = edges_of((10, 10), (210, 1.5), (20, 10), (210, 1.5), (30, 10))
+    apart = edges_of((10, 10), (210, 1.5), (20, 10), (211, 1.5), (30, 10))
     assert isinstance(check(store, apart), Loop)
     together = edges_of((10, 10), (210, 1.5), (211, 1.5), (20, 10), (30, 10))
     assert check(store, together) == "run"
@@ -292,3 +317,52 @@ def test_time_misses_are_reported_with_what_else_they_would_have_failed(tmp_path
     assert result.also_fails["recommended"] == result.candidates_tried
     assert any("times the time asked" in n and "too little recommended" in n for n in result.notes)
     assert min(result.time_ratios) > 1.5
+
+
+# --- a U-turn the edge list cannot show ------------------------------------------
+
+
+def square_with_spur(spur_km: float, at_km: float) -> tuple[tuple[float, float], ...]:
+    """A square loop of 40 km with a spur out and back `at_km` along its bottom side,
+    the way back a few metres off the way out as two routed legs can be."""
+    side = 10.0
+    lat, lon = START
+    dlat, dlon = side / 111.0, side / 69.5
+    at, out = lon + at_km / 69.5, spur_km / 111.0
+    jitter = 0.00003
+    return (
+        (lat, lon),
+        (lat, at),
+        (lat + out, at),
+        (lat + out + jitter, at + jitter),
+        (lat, at + jitter),
+        (lat, lon + dlon),
+        (lat + dlat, lon + dlon),
+        (lat + dlat, lon),
+        (lat, lon),
+    )
+
+
+def test_a_spur_is_found_from_the_route_shape_alone() -> None:
+    assert _longest_retrace_km(square_with_spur(1.5, 5), 4.0) > 1.4
+    assert _longest_retrace_km(square_with_spur(0.2, 5), 4.0) < 0.3
+    assert _longest_retrace_km(square_with_spur(1.5, 8), 4.0) > 1.4
+
+
+def test_a_spur_in_the_last_stretch_is_left_alone() -> None:
+    lat, lon = START
+    # Out along a dead-end street for 1.5 km and back, at the very end of a square loop.
+    route = (*square_with_spur(0.0, 5)[:-1], (lat, lon + 1.5 / 69.5), (lat, lon))
+    assert _longest_retrace_km(route, 4.0) == 0.0
+
+
+def test_a_square_loop_has_no_retrace() -> None:
+    assert _longest_retrace_km(make_route(40, 50).points, 4.0) == 0.0
+
+
+def test_a_spur_whose_edges_do_not_match_is_still_rejected(store: ScoreStore) -> None:
+    # Distinct way ids all round, as when the waypoint at the end of the spur splits an edge.
+    kms = (8, 1.5, 1.5, 8, 8, 8, 5)
+    edges = [Edge(10, ("x",), km, ends=((i, 0.0), (i, 1.0))) for i, km in enumerate(kms)]
+    route = Route(40, 50 * CONFIG.speed_factor * 60, (), square_with_spur(1.5, 5))
+    assert evaluate_route(route, edges, [START], store, 50, CONFIG) == "retrace"
